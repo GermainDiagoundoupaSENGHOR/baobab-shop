@@ -45,7 +45,6 @@ export default function RechercheImage() {
   const searchWithPhoto = async () => {
     if (!photo) return
     setLoading(true)
-    // Ici on appellera l'API Claude pour analyser la photo
     setTimeout(() => {
       router.push('/recherche?q=produit')
       setLoading(false)
@@ -62,7 +61,6 @@ export default function RechercheImage() {
       justifyContent: 'center',
       padding: 24,
     }}>
-      {/* HEADER */}
       <div style={{
         position: 'fixed',
         top: 0, left: 0, right: 0,
@@ -92,7 +90,6 @@ export default function RechercheImage() {
         <div style={{ width: 60 }} />
       </div>
 
-      {/* CAMERA / PHOTO */}
       <div style={{
         marginTop: 60,
         borderRadius: 16,
@@ -115,7 +112,6 @@ export default function RechercheImage() {
 
       <canvas ref={canvasRef} style={{ display: 'none' }} />
 
-      {/* BOUTONS */}
       <div style={{ marginTop: 24, display: 'flex', gap: 12 }}>
         {!photo ? (
           <button

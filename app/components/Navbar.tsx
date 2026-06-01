@@ -18,14 +18,6 @@ export default function Navbar() {
     if (e.key === 'Enter') handleSearch()
   }
 
-  const handleImageFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      setShowImageModal(false)
-      router.push('/recherche-image')
-    }
-  }
-
   return (
     <>
       <header>
@@ -153,6 +145,7 @@ export default function Navbar() {
             { label: '👔 Hommes', href: '/vetements' },
             { label: '👗 Femmes', href: '/vetements' },
             { label: '👕 Enfants', href: '/vetements' },
+            { label: '🌱 Agriculture', href: '/agriculture' },
           ].map((cat) => (
             <Link key={cat.label} href={cat.href} style={{
               color: 'rgba(245,236,215,0.85)',
@@ -191,7 +184,6 @@ export default function Navbar() {
           }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* HEADER MODAL */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
               <div>
                 <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0, marginBottom: 4 }}>
@@ -215,30 +207,27 @@ export default function Navbar() {
             </div>
 
             {/* OPTION 1 — CAMERA */}
-            <label style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 16,
-              padding: 20,
-              border: '1.5px dashed #E8D5B0',
-              borderRadius: 12,
-              cursor: 'pointer',
-              marginBottom: 12,
-              transition: 'background 0.2s',
-            }}>
+            <button
+              onClick={() => { setShowImageModal(false); router.push('/recherche-image') }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 16,
+                padding: 20,
+                border: '1.5px dashed #E8D5B0',
+                borderRadius: 12,
+                cursor: 'pointer',
+                marginBottom: 12,
+                background: 'none',
+                width: '100%',
+              }}
+            >
               <span style={{ fontSize: 28 }}>📷</span>
-              <div>
+              <div style={{ textAlign: 'left' }}>
                 <div style={{ fontWeight: 700, fontSize: 15 }}>Prendre une photo</div>
                 <div style={{ color: '#7A5C42', fontSize: 12 }}>Utiliser l'appareil photo</div>
               </div>
-              <input
-                type="file"
-                accept="image/*"
-                capture="environment"
-                style={{ display: 'none' }}
-                onChange={handleImageFile}
-              />
-            </label>
+            </button>
 
             {/* OPTION 2 — GALERIE */}
             <label style={{
@@ -249,7 +238,6 @@ export default function Navbar() {
               border: '1.5px dashed #E8D5B0',
               borderRadius: 12,
               cursor: 'pointer',
-              transition: 'background 0.2s',
             }}>
               <span style={{ fontSize: 28 }}>🖼️</span>
               <div>
@@ -260,7 +248,13 @@ export default function Navbar() {
                 type="file"
                 accept="image/*"
                 style={{ display: 'none' }}
-                onChange={handleImageFile}
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (file) {
+                    setShowImageModal(false)
+                    router.push('/recherche-image')
+                  }
+                }}
               />
             </label>
           </div>

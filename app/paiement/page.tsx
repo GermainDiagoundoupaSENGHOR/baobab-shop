@@ -21,38 +21,40 @@ export default function Paiement() {
   }
 
   const payMethods = [
-{
-  key: 'wave',
-  icon: (
-    <img
-      src="/wave.png"
-      alt="Wave"
-      style={{ width: 52, height: 52, borderRadius: 14, objectFit: 'cover', display: 'block', margin: '0 auto 8px' }}
-    />
-  ),
-  name: 'Wave',
-  sub: 'Paiement Wave',
-},
+    {
+      key: 'wave',
+      icon: (
+        <img
+          src="/wave.png"
+          alt="Wave"
+          style={{ width: 52, height: 52, borderRadius: 14, objectFit: 'cover', display: 'block', margin: '0 auto 8px' }}
+        />
+      ),
+      name: 'Wave',
+      sub: 'Paiement Wave',
+    },
     {
       key: 'orange',
       icon: (
-        <div style={{ width: 52, height: 52, borderRadius: 14, background: '#FF6600', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 8px' }}>
-          <span style={{ color: 'white', fontWeight: 900, fontSize: 11, fontFamily: 'Arial' }}>orange</span>
-        </div>
+        <img
+          src="/orange.png"
+          alt="Orange Money"
+          style={{ width: 52, height: 52, borderRadius: 14, objectFit: 'cover', display: 'block', margin: '0 auto 8px' }}
+        />
       ),
       name: 'Orange Money',
       sub: 'Paiement OM',
     },
     {
-      key: 'card',
-      icon: (
-        <div style={{ width: 52, height: 52, borderRadius: 14, background: '#1a1a2e', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 8px' }}>
-          <span style={{ fontSize: 24 }}>💳</span>
-        </div>
-      ),
-      name: 'Carte',
-      sub: 'Visa / Mastercard',
-    },
+  key: 'card',
+  icon: (
+    <div style={{ width: 52, height: 52, borderRadius: 14, background: '#1a1a2e', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 8px' }}>
+      <span style={{ fontSize: 28 }}>💳</span>
+    </div>
+  ),
+  name: 'Carte',
+  sub: 'Visa / Mastercard',
+},
   ]
 
   if (success) {

@@ -95,6 +95,30 @@ export default function Navbar() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            {/* MESSAGES */}
+            <Link href="/messages" style={{
+              color: '#F5ECD7',
+              textDecoration: 'none',
+              fontSize: 22,
+              position: 'relative',
+            }}>
+              💬
+              <span style={{
+                position: 'absolute',
+                top: -8, right: -8,
+                background: '#C9860A',
+                color: 'white',
+                borderRadius: '50%',
+                width: 18, height: 18,
+                fontSize: 11,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 700,
+              }}>3</span>
+            </Link>
+
+            {/* PANIER */}
             <Link href="/panier" style={{
               position: 'relative',
               color: '#F5ECD7',
@@ -116,6 +140,7 @@ export default function Navbar() {
                 fontWeight: 700,
               }}>0</span>
             </Link>
+
             <Link href="/auth" style={{
               background: '#2D6A4F',
               color: 'white',
@@ -196,30 +221,20 @@ export default function Navbar() {
               <button
                 onClick={() => setShowImageModal(false)}
                 style={{
-                  background: 'none',
-                  border: 'none',
-                  fontSize: 20,
-                  cursor: 'pointer',
-                  color: '#7A5C42',
-                  padding: 4,
+                  background: 'none', border: 'none',
+                  fontSize: 20, cursor: 'pointer',
+                  color: '#7A5C42', padding: 4,
                 }}
               >×</button>
             </div>
 
-            {/* OPTION 1 — CAMERA */}
             <button
               onClick={() => { setShowImageModal(false); router.push('/recherche-image') }}
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 16,
-                padding: 20,
-                border: '1.5px dashed #E8D5B0',
-                borderRadius: 12,
-                cursor: 'pointer',
-                marginBottom: 12,
-                background: 'none',
-                width: '100%',
+                display: 'flex', alignItems: 'center', gap: 16,
+                padding: 20, border: '1.5px dashed #E8D5B0',
+                borderRadius: 12, cursor: 'pointer',
+                marginBottom: 12, background: 'none', width: '100%',
               }}
             >
               <span style={{ fontSize: 28 }}>📷</span>
@@ -229,15 +244,10 @@ export default function Navbar() {
               </div>
             </button>
 
-            {/* OPTION 2 — GALERIE */}
             <label style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 16,
-              padding: 20,
-              border: '1.5px dashed #E8D5B0',
-              borderRadius: 12,
-              cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 16,
+              padding: 20, border: '1.5px dashed #E8D5B0',
+              borderRadius: 12, cursor: 'pointer',
             }}>
               <span style={{ fontSize: 28 }}>🖼️</span>
               <div>

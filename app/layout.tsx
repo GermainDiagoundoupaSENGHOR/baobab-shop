@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Navbar from './components/Navbar'
+import AssistantWidget from './components/AssistantWidget'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -17,6 +18,7 @@ export default function RootLayout({
       <body style={{ margin: 0, padding: 0, background: '#F5ECD7', fontFamily: 'sans-serif' }}>
         <Navbar />
         {children}
+        <AssistantWidget />
       </body>
     </html>
   )

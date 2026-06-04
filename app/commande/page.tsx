@@ -19,6 +19,27 @@ export default function Commande() {
     'Kédougou', 'Sédhiou',
   ]
 
+  const inputStyle = {
+    width: '100%',
+    padding: '12px 14px',
+    border: '1.5px solid #8B5E3C',
+    borderRadius: 8,
+    fontSize: 14,
+    fontFamily: 'sans-serif',
+    background: '#3A1F0A',
+    boxSizing: 'border-box' as const,
+    color: '#F5ECD7',
+    outline: 'none',
+  }
+
+  const labelStyle = {
+    fontSize: 13,
+    fontWeight: 600 as const,
+    color: '#3A1F0A',
+    display: 'block' as const,
+    marginBottom: 6,
+  }
+
   const handleSubmit = () => {
     if (!form.nom || !form.telephone || !form.region || !form.adresse) {
       return alert('Veuillez remplir tous les champs obligatoires !')
@@ -39,7 +60,7 @@ export default function Commande() {
         </h1>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 24 }}>
-          
+
           {/* FORMULAIRE LIVRAISON */}
           <div style={{
             background: 'white',
@@ -48,13 +69,9 @@ export default function Commande() {
             border: '1px solid #E8D5B0',
           }}>
             <h2 style={{
-              fontSize: 17,
-              fontWeight: 700,
-              color: '#3A1F0A',
-              marginBottom: 20,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
+              fontSize: 17, fontWeight: 700,
+              color: '#3A1F0A', marginBottom: 20,
+              display: 'flex', alignItems: 'center', gap: 8,
             }}>
               📍 Informations de livraison
             </h2>
@@ -62,111 +79,82 @@ export default function Commande() {
             {/* NOM + TELEPHONE */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
               <div>
-                <label style={{ fontSize: 13, fontWeight: 600, color: '#3A1F0A', display: 'block', marginBottom: 6 }}>
-                  Nom complet *
-                </label>
+                <label style={labelStyle}>Nom complet *</label>
                 <input
                   type="text"
                   placeholder="Ex: Amadou Diallo"
                   value={form.nom}
                   onChange={(e) => setForm({ ...form, nom: e.target.value })}
-                  style={{
-                    width: '100%', padding: '12px 14px',
-                    border: '1.5px solid #E8D5B0', borderRadius: 8,
-                    fontSize: 14, fontFamily: 'sans-serif',
-                    boxSizing: 'border-box',
-                  }}
+                  style={inputStyle}
                 />
               </div>
               <div>
-                <label style={{ fontSize: 13, fontWeight: 600, color: '#3A1F0A', display: 'block', marginBottom: 6 }}>
-                  Téléphone *
-                </label>
+                <label style={labelStyle}>Téléphone *</label>
                 <input
                   type="tel"
                   placeholder="77 123 45 67"
                   value={form.telephone}
                   onChange={(e) => setForm({ ...form, telephone: e.target.value })}
-                  style={{
-                    width: '100%', padding: '12px 14px',
-                    border: '1.5px solid #E8D5B0', borderRadius: 8,
-                    fontSize: 14, fontFamily: 'sans-serif',
-                    boxSizing: 'border-box',
-                  }}
+                  style={inputStyle}
                 />
               </div>
             </div>
 
             {/* REGION */}
             <div style={{ marginBottom: 16 }}>
-              <label style={{ fontSize: 13, fontWeight: 600, color: '#3A1F0A', display: 'block', marginBottom: 6 }}>
-                Région *
-              </label>
+              <label style={labelStyle}>Région *</label>
               <select
                 value={form.region}
                 onChange={(e) => setForm({ ...form, region: e.target.value })}
-                style={{
-                  width: '100%', padding: '12px 14px',
-                  border: '1.5px solid #E8D5B0', borderRadius: 8,
-                  fontSize: 14, fontFamily: 'sans-serif',
-                  background: 'white', boxSizing: 'border-box',
-                }}
+                style={inputStyle}
               >
-                <option value="">Choisir votre région</option>
+                <option value="" style={{ background: '#3A1F0A', color: '#F5ECD7' }}>
+                  Choisir votre région
+                </option>
                 {regions.map((r) => (
-                  <option key={r} value={r}>{r}</option>
+                  <option key={r} value={r} style={{ background: '#3A1F0A', color: '#F5ECD7' }}>
+                    {r}
+                  </option>
                 ))}
               </select>
             </div>
 
             {/* ADRESSE */}
             <div style={{ marginBottom: 16 }}>
-              <label style={{ fontSize: 13, fontWeight: 600, color: '#3A1F0A', display: 'block', marginBottom: 6 }}>
-                Adresse complète *
-              </label>
+              <label style={labelStyle}>Adresse complète *</label>
               <input
                 type="text"
                 placeholder="Ex: Médina, Rue 12, Dakar"
                 value={form.adresse}
                 onChange={(e) => setForm({ ...form, adresse: e.target.value })}
-                style={{
-                  width: '100%', padding: '12px 14px',
-                  border: '1.5px solid #E8D5B0', borderRadius: 8,
-                  fontSize: 14, fontFamily: 'sans-serif',
-                  boxSizing: 'border-box',
-                }}
+                style={inputStyle}
               />
             </div>
 
             {/* NOTES */}
             <div>
-              <label style={{ fontSize: 13, fontWeight: 600, color: '#3A1F0A', display: 'block', marginBottom: 6 }}>
-                Notes (optionnel)
-              </label>
+              <label style={labelStyle}>Notes (optionnel)</label>
               <textarea
                 placeholder="Instructions spéciales pour la livraison..."
                 value={form.notes}
                 onChange={(e) => setForm({ ...form, notes: e.target.value })}
                 rows={4}
                 style={{
-                  width: '100%', padding: '12px 14px',
-                  border: '1.5px solid #2D6A4F', borderRadius: 8,
-                  fontSize: 14, fontFamily: 'sans-serif',
-                  resize: 'vertical', boxSizing: 'border-box',
-                  outline: 'none',
+                  ...inputStyle,
+                  resize: 'vertical' as const,
                 }}
               />
             </div>
           </div>
 
-          {/* RÉSUMÉ COMMANDE */}
+          {/* RÉSUMÉ */}
           <div>
             <div style={{
               background: 'white',
               borderRadius: 14,
               padding: 24,
               border: '1px solid #E8D5B0',
-              position: 'sticky',
+              position: 'sticky' as const,
               top: 20,
             }}>
               <h2 style={{ fontSize: 17, fontWeight: 700, color: '#3A1F0A', marginBottom: 16 }}>
@@ -175,22 +163,15 @@ export default function Commande() {
 
               {/* PRODUIT */}
               <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 12,
-                marginBottom: 16,
-                paddingBottom: 16,
+                display: 'flex', alignItems: 'center', gap: 12,
+                marginBottom: 16, paddingBottom: 16,
                 borderBottom: '1px solid #F5ECD7',
               }}>
                 <div style={{
-                  width: 44, height: 44,
-                  background: '#F5ECD7',
-                  borderRadius: 8,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: 22,
-                  flexShrink: 0,
+                  width: 44, height: 44, background: '#F5ECD7',
+                  borderRadius: 8, display: 'flex',
+                  alignItems: 'center', justifyContent: 'center',
+                  fontSize: 22, flexShrink: 0,
                 }}>
                   📱
                 </div>
@@ -208,20 +189,17 @@ export default function Commande() {
               {/* TOTAUX */}
               <div style={{ marginBottom: 20 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#7A5C42', marginBottom: 8 }}>
-                  <span>Sous-total</span>
-                  <span>285 000 FCFA</span>
+                  <span>Sous-total</span><span>285 000 FCFA</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#7A5C42', marginBottom: 12 }}>
-                  <span>Livraison</span>
-                  <span>2 500 FCFA</span>
+                  <span>Livraison</span><span>2 500 FCFA</span>
                 </div>
                 <div style={{
                   display: 'flex', justifyContent: 'space-between',
                   fontSize: 17, fontWeight: 700, color: '#2D6A4F',
                   borderTop: '1px solid #E8D5B0', paddingTop: 12,
                 }}>
-                  <span>Total</span>
-                  <span>287 500 FCFA</span>
+                  <span>Total</span><span>287 500 FCFA</span>
                 </div>
               </div>
 
@@ -229,16 +207,11 @@ export default function Commande() {
               <button
                 onClick={handleSubmit}
                 style={{
-                  width: '100%',
-                  background: '#2D6A4F',
-                  color: 'white',
-                  border: 'none',
-                  padding: '14px',
-                  borderRadius: 24,
-                  cursor: 'pointer',
-                  fontWeight: 700,
-                  fontSize: 15,
-                  fontFamily: 'sans-serif',
+                  width: '100%', background: '#2D6A4F',
+                  color: 'white', border: 'none',
+                  padding: '14px', borderRadius: 24,
+                  cursor: 'pointer', fontWeight: 700,
+                  fontSize: 15, fontFamily: 'sans-serif',
                   marginBottom: 12,
                 }}
               >

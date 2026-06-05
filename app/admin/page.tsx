@@ -62,14 +62,14 @@ export default function Admin() {
 
   const actions = [
     { icon: '➕', label: 'Ajouter un produit', sub: 'Publier un nouveau produit', color: '#2D6A4F', onClick: () => setShowForm(true) },
-    { icon: '📋', label: 'Voir les commandes', sub: 'Commandes reçues', color: '#1B8EF8', href: '/commande' },
+    { icon: '📋', label: 'Voir les commandes', sub: 'Commandes reçues', color: '#1B8EF8', href: '/orders' },
     { icon: '💬', label: 'Messagerie', sub: 'Discuter avec les clients', color: '#FF6600', href: '/messages' },
     { icon: '👤', label: 'Mon profil', sub: 'Modifier mes infos', color: '#5C3317', href: '/auth' },
   ]
 
   return (
     <div style={{ background: '#F5ECD7', minHeight: '100vh', padding: 20 }}>
-      
+
       {/* HEADER */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
         <div>
@@ -81,7 +81,7 @@ export default function Admin() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
-          <Link href="/commande" style={{
+          <Link href="/orders" style={{
             background: 'white', color: '#3A1F0A',
             border: '1.5px solid #E8D5B0', padding: '9px 16px',
             borderRadius: 20, textDecoration: 'none',
@@ -200,7 +200,7 @@ export default function Admin() {
                     width: '100%', padding: '10px 12px',
                     border: '1.5px solid #E8D5B0', borderRadius: 8,
                     fontSize: 14, fontFamily: 'sans-serif',
-                    boxSizing: 'border-box',
+                    boxSizing: 'border-box' as const,
                   }}
                 />
               </div>
@@ -237,7 +237,8 @@ export default function Admin() {
                 width: '100%', padding: '10px 12px',
                 border: '1.5px solid #E8D5B0', borderRadius: 8,
                 fontSize: 14, fontFamily: 'sans-serif',
-                resize: 'vertical', boxSizing: 'border-box',
+                resize: 'vertical' as const,
+                boxSizing: 'border-box' as const,
               }}
             />
           </div>

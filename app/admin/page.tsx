@@ -61,11 +61,12 @@ export default function Admin() {
   ]
 
   const actions = [
-    { icon: '➕', label: 'Ajouter un produit', sub: 'Publier un nouveau produit', color: '#2D6A4F', onClick: () => setShowForm(true) },
-    { icon: '📋', label: 'Voir les commandes', sub: 'Commandes reçues', color: '#1B8EF8', href: '/orders' },
-    { icon: '💬', label: 'Messagerie', sub: 'Discuter avec les clients', color: '#FF6600', href: '/messages' },
-    { icon: '👤', label: 'Mon profil', sub: 'Modifier mes infos', color: '#5C3317', href: '/auth' },
-  ]
+  { icon: '➕', label: 'Ajouter un produit', sub: 'Publier un nouveau produit', color: '#2D6A4F', onClick: () => setShowForm(true) },
+  { icon: '📦', label: 'Ajout multiple', sub: 'Plusieurs variantes à la fois', color: '#8B5E3C', href: '/admin/ajout-multiple' },
+  { icon: '📋', label: 'Voir les commandes', sub: 'Commandes reçues', color: '#1B8EF8', href: '/orders' },
+  { icon: '💬', label: 'Messagerie', sub: 'Discuter avec les clients', color: '#FF6600', href: '/messages' },
+  { icon: '👤', label: 'Mon profil', sub: 'Modifier mes infos', color: '#5C3317', href: '/auth' },
+]
 
   return (
     <div style={{ background: '#F5ECD7', minHeight: '100vh', padding: 20 }}>

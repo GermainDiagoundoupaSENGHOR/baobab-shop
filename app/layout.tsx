@@ -19,7 +19,7 @@ export default function RootLayout({
       <body style={{ margin: 0, padding: 0, background: '#F5ECD7', fontFamily: 'sans-serif', paddingBottom: 70 }}>
         <Navbar />
         {children}
-        <AssistantWidget />
+        import AssistantWidget from './components/AssistantWidget'
         <BottomNav />
       </body>
     </html>

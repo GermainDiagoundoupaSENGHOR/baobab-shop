@@ -10,7 +10,7 @@ export default function BottomNav() {
     { href: '/electronique', icon: '📦', label: 'Catégories' },
     { href: '/messages', icon: '💬', label: 'Messagerie', badge: 3 },
     { href: '/panier', icon: '🛒', label: 'Panier', badge: 0 },
-    { href: '/auth', icon: '👤', label: 'Mon Compte' },
+    { href: '/profil', icon: '👤', label: 'Mon Compte' },
   ]
 
   return (

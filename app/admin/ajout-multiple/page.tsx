@@ -14,6 +14,7 @@ export default function AjoutMultiple() {
   const [form, setForm] = useState({
     name: '',
     price: '',
+    original_price: '',
     category: 'elec',
     sub_category: '',
     description: '',
@@ -23,6 +24,7 @@ export default function AjoutMultiple() {
     { couleur: '', emoji: '', stock: '10' },
   ])
   const [loading, setLoading] = useState(false)
+  const [aiLoading, setAiLoading] = useState(false)
 
   const addVariant = () => {
     setVariants([...variants, { couleur: '', emoji: '', stock: '10' }])
@@ -36,6 +38,29 @@ export default function AjoutMultiple() {
     setVariants(variants.map((v, idx) => idx === i ? { ...v, [key]: value } : v))
   }
 
+  const generateDescription = async () => {
+    if (!form.name) return alert("Entrez le nom du produit d'abord !")
+    setAiLoading(true)
+    try {
+      const res = await fetch('/api/assistant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          lang: 'fr',
+          messages: [{
+            role: 'user',
+            content: `Génère une description courte et attractive (2-3 phrases) pour ce produit à vendre sur un e-commerce sénégalais: "${form.name}". Réponds UNIQUEMENT avec la description, sans introduction.`
+          }]
+        })
+      })
+      const data = await res.json()
+      setForm({ ...form, description: data.message })
+    } catch {
+      alert('Erreur IA')
+    }
+    setAiLoading(false)
+  }
+
   const handleSubmit = async () => {
     if (!form.name || !form.price) return alert('Nom et prix obligatoires !')
     if (variants.some(v => !v.couleur)) return alert('Remplissez toutes les couleurs !')
@@ -47,7 +72,7 @@ export default function AjoutMultiple() {
       price: parseFloat(form.price),
       category: form.category,
       sub_category: form.sub_category,
-     emoji: v.emoji || (form.category === 'elec' ? '📱' : form.category === 'cloth' ? '👗' : '🌱'),
+      emoji: v.emoji || (form.category === 'elec' ? '📱' : form.category === 'cloth' ? '👗' : '🌱'),
       description: form.description,
       stock: parseInt(v.stock) || 0,
     }))
@@ -81,7 +106,7 @@ export default function AjoutMultiple() {
           📦 Ajout multiple
         </h1>
         <p style={{ color: '#7A5C42', fontSize: 13, marginBottom: 24 }}>
-          Ajoutez plusieurs variantes d'un même produit en une seule fois
+          Ajoutez plusieurs variantes d un même produit en une seule fois
         </p>
 
         {/* INFOS COMMUNES */}
@@ -97,7 +122,8 @@ export default function AjoutMultiple() {
             📝 Informations communes
           </h2>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+          {/* NOM + PRIX + PRIX ORIGINAL */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14, marginBottom: 14 }}>
             <div>
               <label style={{ fontSize: 12, fontWeight: 600, color: '#7A5C42', display: 'block', marginBottom: 5 }}>
                 Nom du produit *
@@ -131,8 +157,26 @@ export default function AjoutMultiple() {
                 }}
               />
             </div>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: '#7A5C42', display: 'block', marginBottom: 5 }}>
+                Prix original (FCFA)
+              </label>
+              <input
+                value={form.original_price}
+                onChange={(e) => setForm({ ...form, original_price: e.target.value })}
+                placeholder="Ex: 25000"
+                type="number"
+                style={{
+                  width: '100%', padding: '10px 12px',
+                  border: '1.5px solid #E8D5B0', borderRadius: 8,
+                  fontSize: 14, fontFamily: 'sans-serif',
+                  boxSizing: 'border-box' as const,
+                }}
+              />
+            </div>
           </div>
 
+          {/* CATEGORIE */}
           <div style={{ marginBottom: 14 }}>
             <label style={{ fontSize: 12, fontWeight: 600, color: '#7A5C42', display: 'block', marginBottom: 5 }}>
               Catégorie
@@ -152,14 +196,30 @@ export default function AjoutMultiple() {
             </select>
           </div>
 
+          {/* DESCRIPTION + IA */}
           <div>
-            <label style={{ fontSize: 12, fontWeight: 600, color: '#7A5C42', display: 'block', marginBottom: 5 }}>
-              Description (commune à toutes les variantes)
-            </label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: '#7A5C42' }}>
+                Description (commune à toutes les variantes)
+              </label>
+              <button
+                onClick={generateDescription}
+                style={{
+                  background: '#C9860A', color: 'white',
+                  border: 'none', padding: '5px 12px',
+                  borderRadius: 16, cursor: 'pointer',
+                  fontSize: 12, fontWeight: 700,
+                  fontFamily: 'sans-serif',
+                  display: 'flex', alignItems: 'center', gap: 6,
+                }}
+              >
+                {aiLoading ? '⏳' : '🤖 IA'}
+              </button>
+            </div>
             <textarea
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
-              placeholder="Ex: Montre Casio originale, résistante à l'eau, garantie 1 an..."
+              placeholder="Ex: Montre Casio originale... ou cliquez sur IA"
               rows={3}
               style={{
                 width: '100%', padding: '10px 12px',
@@ -289,15 +349,24 @@ export default function AjoutMultiple() {
                   gap: 12, padding: '8px 12px',
                   background: '#F5ECD7', borderRadius: 8,
                 }}>
-                  <span style={{ fontSize: 20 }}>{v.emoji || (form.category === 'elec' ? '📱' : form.category === 'cloth' ? '👗' : '🌱')}</span>
+                  <span style={{ fontSize: 20 }}>
+                    {v.emoji || (form.category === 'elec' ? '📱' : form.category === 'cloth' ? '👗' : '🌱')}
+                  </span>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: '#2C1A0E' }}>
                       {form.name}{v.couleur ? ` — ${v.couleur}` : ''}
                     </div>
                     <div style={{ fontSize: 11, color: '#7A5C42' }}>Stock: {v.stock || 0}</div>
                   </div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: '#2D6A4F' }}>
-                    {form.price ? parseInt(form.price).toLocaleString('fr-FR') + ' FCFA' : '—'}
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#2D6A4F' }}>
+                      {form.price ? parseInt(form.price).toLocaleString('fr-FR') + ' FCFA' : '—'}
+                    </div>
+                    {form.original_price && (
+                      <div style={{ fontSize: 11, color: '#e53e3e', textDecoration: 'line-through' }}>
+                        {parseInt(form.original_price).toLocaleString('fr-FR')} FCFA
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}

@@ -186,6 +186,7 @@ export default function Admin() {
             {[
               { key: 'name', label: 'Nom du produit *', placeholder: 'Samsung Galaxy A55' },
               { key: 'price', label: 'Prix (FCFA) *', placeholder: '285000' },
+              { key: 'original_price', label: 'Prix original (FCFA)', placeholder: '350000' },
               { key: 'emoji', label: 'Emoji', placeholder: '📱' },
               { key: 'stock', label: 'Stock', placeholder: '10' },
             ].map((f) => (

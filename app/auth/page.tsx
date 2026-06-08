@@ -10,6 +10,7 @@ export default function Auth() {
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [loading, setLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
   const router = useRouter()
 
   const handleLogin = async () => {
@@ -51,6 +52,7 @@ export default function Auth() {
         width: '100%',
         maxWidth: 400,
         border: '1px solid #E8D5B0',
+        boxShadow: '0 8px 32px rgba(58,31,10,0.1)',
       }}>
         {/* LOGO */}
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
@@ -119,7 +121,7 @@ export default function Auth() {
                     fontSize: 14,
                     fontFamily: 'sans-serif',
                     background: '#F5ECD7',
-                    boxSizing: 'border-box',
+                    boxSizing: 'border-box' as const,
                   }}
                 />
               </div>
@@ -140,13 +142,14 @@ export default function Auth() {
                     fontSize: 14,
                     fontFamily: 'sans-serif',
                     background: '#F5ECD7',
-                    boxSizing: 'border-box',
+                    boxSizing: 'border-box' as const,
                   }}
                 />
               </div>
             </>
           )}
 
+          {/* EMAIL */}
           <div>
             <label style={{ fontSize: 12, fontWeight: 600, color: '#7A5C42', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
               Email
@@ -164,33 +167,54 @@ export default function Auth() {
                 fontSize: 14,
                 fontFamily: 'sans-serif',
                 background: '#F5ECD7',
-                boxSizing: 'border-box',
+                boxSizing: 'border-box' as const,
               }}
             />
           </div>
 
+          {/* MOT DE PASSE */}
           <div>
             <label style={{ fontSize: 12, fontWeight: 600, color: '#7A5C42', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
               Mot de passe
             </label>
-            <input
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '10px 14px',
-                border: '1.5px solid #E8D5B0',
-                borderRadius: 8,
-                fontSize: 14,
-                fontFamily: 'sans-serif',
-                background: '#F5ECD7',
-                boxSizing: 'border-box',
-              }}
-            />
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '10px 44px 10px 14px',
+                  border: '1.5px solid #E8D5B0',
+                  borderRadius: 8,
+                  fontSize: 14,
+                  fontFamily: 'sans-serif',
+                  background: '#F5ECD7',
+                  boxSizing: 'border-box' as const,
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={{
+                  position: 'absolute',
+                  right: 12, top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: 18,
+                  padding: 0,
+                  lineHeight: 1,
+                }}
+              >
+                {showPassword ? '🙈' : '👁️'}
+              </button>
+            </div>
           </div>
 
+          {/* BOUTON */}
           <button
             onClick={tab === 'login' ? handleLogin : handleRegister}
             disabled={loading}

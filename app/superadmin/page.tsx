@@ -1,7 +1,6 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
-import QRCode from 'react-qr-code'
 
 interface Employee {
   id: string
@@ -14,73 +13,191 @@ interface Employee {
   percentage: number
 }
 
-const SUPER_ADMIN_EMAIL = 'senghorgermaindiagounda@gmail.com'
+const SUPER_ADMIN_EMAIL = 'baobabshop@gmail.com'
 
 export default function SuperAdmin() {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [employees, setEmployees] = useState<Employee[]>([])
   const [selectedQR, setSelectedQR] = useState<Employee | null>(null)
   const [selectedPay, setSelectedPay] = useState<Employee | null>(null)
-  const [activeTab, setActiveTab] = useState<'employees' | 'payments'>('employees')
-  const [employees, setEmployees] = useState<Employee[]>([
-    { id: '1', name: 'Amadou Diallo', email: 'amadou@gmail.com', role: 'employee', created_at: '2026-06-01', payment_type: 'salary', salary: 150000, percentage: 0 },
-    { id: '2', name: 'Fatou Sow', email: 'fatou@gmail.com', role: 'admin', created_at: '2026-06-02', payment_type: 'percentage', salary: 0, percentage: 10 },
-    { id: '3', name: 'Moussa Ndiaye', email: 'moussa@gmail.com', role: 'employee', created_at: '2026-06-03', payment_type: 'salary', salary: 120000, percentage: 0 },
-  ])
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [activeTab, setActiveTab] = useState<'employees' | 'payments' | 'stats'>('employees')
+  const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
+  const [totalRevenue, setTotalRevenue] = useState(0)
+  const [totalOrders, setTotalOrders] = useState(0)
+  const [totalUsers, setTotalUsers] = useState(0)
+  const [newEmployee, setNewEmployee] = useState({
+    name: '', email: '', role: 'employee' as 'admin' | 'employee',
+    payment_type: 'salary' as 'salary' | 'percentage',
+    salary: 0, percentage: 0,
+  })
+  const qrCanvasRef = useRef<HTMLCanvasElement>(null)
 
-  const totalRevenue = 4500000
+  const showMsg = (text: string, type: 'success' | 'error') => {
+    setMessage({ text, type })
+    setTimeout(() => setMessage(null), 4000)
+  }
+
+  // Charger les données
+  useEffect(() => {
+    const init = async () => {
+      const { data: authData } = await supabase.auth.getUser()
+      setUser(authData.user)
+
+      if (authData.user?.email === SUPER_ADMIN_EMAIL) {
+        await loadEmployees()
+        await loadStats()
+      }
+      setLoading(false)
+    }
+    init()
+  }, [])
+
+  // QR code avec baobab
+  useEffect(() => {
+    if (!selectedQR || !qrCanvasRef.current) return
+    const canvas = qrCanvasRef.current
+    const ctx = canvas.getContext('2d')!
+    const size = 220
+    canvas.width = size
+    canvas.height = size
+
+    const qrImg = new Image()
+    qrImg.crossOrigin = 'anonymous'
+    qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=baobab-shop://employee/${selectedQR.id}/${selectedQR.email}&margin=10&ecc=H`
+    qrImg.onload = () => {
+      ctx.drawImage(qrImg, 0, 0, size, size)
+      const cx = size / 2, cy = size / 2, r = 32
+      ctx.beginPath()
+      ctx.arc(cx, cy, r, 0, Math.PI * 2)
+      ctx.fillStyle = 'white'
+      ctx.fill()
+      const logo = new Image()
+      logo.src = '/image.png'
+      logo.onload = () => {
+        ctx.drawImage(logo, cx - 24, cy - 24, 48, 48)
+      }
+      logo.onerror = () => {
+        ctx.font = 'bold 28px serif'
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillText('🌳', cx, cy)
+      }
+    }
+  }, [selectedQR])
+
+  const loadEmployees = async () => {
+    const { data, error } = await supabase
+      .from('employees').select('*').order('created_at', { ascending: false })
+    if (error) return showMsg('❌ Erreur chargement employés', 'error')
+    setEmployees(data || [])
+  }
+
+  const loadStats = async () => {
+    // Commandes
+    const { data: orders } = await supabase.from('orders').select('total')
+    if (orders) {
+      setTotalOrders(orders.length)
+      setTotalRevenue(orders.reduce((sum, o) => sum + (o.total || 0), 0))
+    }
+    // Utilisateurs (profiles)
+    const { count } = await supabase.from('profiles').select('*', { count: 'exact', head: true })
+    setTotalUsers(count || 0)
+  }
+
+  const addEmployee = async () => {
+    if (!newEmployee.name || !newEmployee.email)
+      return showMsg('❌ Nom et email obligatoires !', 'error')
+
+    const { error } = await supabase.from('employees').insert([newEmployee])
+    if (error) return showMsg('❌ Erreur: ' + error.message, 'error')
+
+    showMsg('✅ Employé ajouté !', 'success')
+    setShowAddModal(false)
+    setNewEmployee({ name: '', email: '', role: 'employee', payment_type: 'salary', salary: 0, percentage: 0 })
+    await loadEmployees()
+  }
+
+  const deleteEmployee = async (id: string, name: string) => {
+    if (!window.confirm(`Supprimer ${name} ?`)) return
+    const { error } = await supabase.from('employees').delete().eq('id', id)
+    if (error) return showMsg('❌ Erreur suppression', 'error')
+    showMsg('✅ Employé supprimé !', 'success')
+    await loadEmployees()
+  }
+
+  const updateRole = async (id: string, role: 'admin' | 'employee') => {
+    const { error } = await supabase.from('employees').update({ role }).eq('id', id)
+    if (error) return showMsg('❌ Erreur mise à jour', 'error')
+    showMsg(`✅ Rôle mis à jour !`, 'success')
+    await loadEmployees()
+  }
+
+  const updatePayment = async (emp: Employee) => {
+    const { error } = await supabase.from('employees')
+      .update({
+        payment_type: emp.payment_type,
+        salary: emp.salary,
+        percentage: emp.percentage,
+      }).eq('id', emp.id)
+    if (error) return showMsg('❌ Erreur mise à jour paiement', 'error')
+    showMsg('✅ Paiement mis à jour !', 'success')
+    setSelectedPay(null)
+    await loadEmployees()
+  }
+
+  const downloadQR = () => {
+    if (!qrCanvasRef.current) return
+    const link = document.createElement('a')
+    link.download = `qr-${selectedQR?.name}.png`
+    link.href = qrCanvasRef.current.toDataURL()
+    link.click()
+  }
+
   const totalSalaries = employees.reduce((sum, e) => {
     if (e.payment_type === 'salary') return sum + e.salary
     return sum + (totalRevenue * e.percentage / 100)
   }, 0)
 
-  useEffect(() => {
-    const getUser = async () => {
-      const { data } = await supabase.auth.getUser()
-      setUser(data.user)
-      setLoading(false)
-    }
-    getUser()
-  }, [])
+  if (loading) return (
+    <div style={{ textAlign: 'center', padding: 60, fontSize: 32 }}>⏳</div>
+  )
 
-  const updatePayment = (emp: Employee) => {
-    setEmployees(employees.map(e => e.id === emp.id ? emp : e))
-    setSelectedPay(null)
-    alert('✅ Paiement mis à jour !')
-  }
-
-  const promoteToAdmin = (id: string) => {
-    setEmployees(employees.map(e => e.id === id ? { ...e, role: 'admin' } : e))
-  }
-
-  const demoteToEmployee = (id: string) => {
-    setEmployees(employees.map(e => e.id === id ? { ...e, role: 'employee' } : e))
-  }
-
-  if (loading) return <div style={{ textAlign: 'center', padding: 60, fontSize: 32 }}>⏳</div>
-
-  if (!user || user.email !== SUPER_ADMIN_EMAIL) {
-    return (
-      <div style={{ background: '#F5ECD7', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 64, marginBottom: 16 }}>🔒</div>
-          <h2 style={{ fontFamily: 'Georgia, serif', color: '#3A1F0A' }}>Accès refusé</h2>
-          <p style={{ color: '#7A5C42' }}>Seul le Super Admin peut accéder à cette page</p>
-        </div>
+  if (!user || user.email !== SUPER_ADMIN_EMAIL) return (
+    <div style={{ background: '#F5ECD7', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ fontSize: 64, marginBottom: 16 }}>🔒</div>
+        <h2 style={{ fontFamily: 'Georgia, serif', color: '#3A1F0A' }}>Accès refusé</h2>
+        <p style={{ color: '#7A5C42' }}>Seul le Super Admin peut accéder à cette page</p>
       </div>
-    )
-  }
+    </div>
+  )
 
   return (
-    <div style={{ background: '#F5ECD7', minHeight: '100vh', padding: 24 }}>
+    <div style={{ background: '#F5ECD7', minHeight: '100vh', padding: 24, fontFamily: 'sans-serif' }}>
       <div style={{ maxWidth: 900, margin: '0 auto' }}>
+
+        {/* MESSAGE */}
+        {message && (
+          <div style={{
+            position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)',
+            background: message.type === 'success' ? '#d1fae5' : '#fee2e2',
+            border: `1px solid ${message.type === 'success' ? '#6ee7b7' : '#fca5a5'}`,
+            color: message.type === 'success' ? '#065f46' : '#991b1b',
+            borderRadius: 10, padding: '10px 20px', fontSize: 13,
+            fontWeight: 600, zIndex: 1000,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.1)', whiteSpace: 'nowrap',
+          }}>
+            {message.text}
+          </div>
+        )}
 
         {/* HEADER */}
         <div style={{
           background: 'linear-gradient(135deg, #3A1F0A, #5C3317)',
-          borderRadius: 16, padding: 24,
-          marginBottom: 24, display: 'flex',
-          alignItems: 'center', justifyContent: 'space-between',
+          borderRadius: 16, padding: 24, marginBottom: 24,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <div>
             <h1 style={{ fontFamily: 'Georgia, serif', color: '#F5ECD7', fontSize: 24, margin: 0 }}>
@@ -100,13 +217,13 @@ export default function SuperAdmin() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 24 }}>
           {[
             { icon: '👥', label: 'Employés', value: employees.length },
-            { icon: '⚙️', label: 'Admins', value: employees.filter(e => e.role === 'admin').length },
+            { icon: '🛒', label: 'Commandes', value: totalOrders },
             { icon: '💰', label: 'Revenus', value: totalRevenue.toLocaleString('fr-FR') + ' F' },
-            { icon: '💸', label: 'Salaires', value: totalSalaries.toLocaleString('fr-FR') + ' F' },
+            { icon: '👤', label: 'Clients', value: totalUsers },
           ].map((s) => (
             <div key={s.label} style={{
               background: 'white', borderRadius: 12,
-              padding: '16px', textAlign: 'center',
+              padding: 16, textAlign: 'center',
               border: '1px solid #E8D5B0',
             }}>
               <div style={{ fontSize: 24 }}>{s.icon}</div>
@@ -121,41 +238,54 @@ export default function SuperAdmin() {
           {[
             { key: 'employees', label: '👥 Employés' },
             { key: 'payments', label: '💰 Paiements' },
+            { key: 'stats', label: '📊 Statistiques' },
           ].map((tab) => (
             <button key={tab.key} onClick={() => setActiveTab(tab.key as any)} style={{
-              padding: '9px 20px', borderRadius: 20,
-              border: '1.5px solid',
+              padding: '9px 20px', borderRadius: 20, border: '1.5px solid',
               borderColor: activeTab === tab.key ? '#3A1F0A' : '#E8D5B0',
               background: activeTab === tab.key ? '#3A1F0A' : 'white',
               color: activeTab === tab.key ? '#F5ECD7' : '#7A5C42',
-              fontWeight: 600, fontSize: 13,
-              cursor: 'pointer', fontFamily: 'sans-serif',
+              fontWeight: 600, fontSize: 13, cursor: 'pointer',
             }}>
               {tab.label}
             </button>
           ))}
         </div>
 
-        {/* LISTE EMPLOYÉS */}
+        {/* ONGLET EMPLOYÉS */}
         {activeTab === 'employees' && (
           <div style={{ background: 'white', borderRadius: 14, border: '1px solid #E8D5B0', overflow: 'hidden' }}>
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid #F5ECD7' }}>
+            <div style={{
+              padding: '16px 20px', borderBottom: '1px solid #F5ECD7',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            }}>
               <h2 style={{ fontFamily: 'Georgia, serif', color: '#3A1F0A', fontSize: 17, margin: 0 }}>
                 👥 Gestion des employés
               </h2>
+              <button onClick={() => setShowAddModal(true)} style={{
+                background: '#2D6A4F', color: 'white', border: 'none',
+                padding: '8px 16px', borderRadius: 20, cursor: 'pointer',
+                fontSize: 13, fontWeight: 700,
+              }}>
+                ➕ Ajouter
+              </button>
             </div>
-            {employees.map((emp, i) => (
+
+            {employees.length === 0 ? (
+              <div style={{ padding: 40, textAlign: 'center', color: '#7A5C42' }}>
+                Aucun employé. Cliquez sur ➕ Ajouter.
+              </div>
+            ) : employees.map((emp, i) => (
               <div key={emp.id} style={{
-                display: 'flex', alignItems: 'center',
-                gap: 14, padding: '16px 20px',
+                display: 'flex', alignItems: 'center', gap: 14,
+                padding: '16px 20px',
                 borderBottom: i < employees.length - 1 ? '1px solid #F5ECD7' : 'none',
               }}>
                 <div style={{
                   width: 44, height: 44, borderRadius: '50%',
                   background: emp.role === 'admin' ? '#2D6A4F' : '#8B5E3C',
-                  display: 'flex', alignItems: 'center',
-                  justifyContent: 'center', color: 'white',
-                  fontWeight: 700, fontSize: 18, flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: 'white', fontWeight: 700, fontSize: 18, flexShrink: 0,
                 }}>
                   {emp.name[0]}
                 </div>
@@ -164,80 +294,78 @@ export default function SuperAdmin() {
                   <div style={{ fontSize: 12, color: '#7A5C42' }}>{emp.email}</div>
                   <div style={{ fontSize: 11, color: '#2D6A4F', marginTop: 2 }}>
                     {emp.payment_type === 'salary'
-                      ? `💵 Salaire fixe: ${emp.salary.toLocaleString('fr-FR')} FCFA`
-                      : `📊 Commission: ${emp.percentage}% des bénéfices`
-                    }
+                      ? `💵 Salaire: ${emp.salary.toLocaleString('fr-FR')} FCFA`
+                      : `📊 Commission: ${emp.percentage}%`}
                   </div>
                 </div>
                 <div style={{
                   background: emp.role === 'admin' ? '#D8F3DC' : '#F5ECD7',
                   color: emp.role === 'admin' ? '#2D6A4F' : '#8B5E3C',
-                  fontSize: 11, fontWeight: 700,
-                  padding: '4px 12px', borderRadius: 20,
+                  fontSize: 11, fontWeight: 700, padding: '4px 12px', borderRadius: 20,
                 }}>
                   {emp.role === 'admin' ? '⚙️ Admin' : '👤 Employé'}
                 </div>
-                <div style={{ display: 'flex', gap: 8 }}>
+                <div style={{ display: 'flex', gap: 6 }}>
                   <button onClick={() => setSelectedQR(emp)} style={{
-                    background: '#3A1F0A', color: 'white',
-                    border: 'none', padding: '7px 10px',
-                    borderRadius: 8, cursor: 'pointer',
-                    fontSize: 12, fontFamily: 'sans-serif',
-                  }}>📱 QR</button>
+                    background: '#3A1F0A', color: 'white', border: 'none',
+                    padding: '7px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 12,
+                  }}>📱</button>
                   <button onClick={() => setSelectedPay({ ...emp })} style={{
-                    background: '#C9860A', color: 'white',
-                    border: 'none', padding: '7px 10px',
-                    borderRadius: 8, cursor: 'pointer',
-                    fontSize: 12, fontFamily: 'sans-serif',
-                  }}>💰 Payer</button>
+                    background: '#C9860A', color: 'white', border: 'none',
+                    padding: '7px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 12,
+                  }}>💰</button>
                   {emp.role === 'employee' ? (
-                    <button onClick={() => promoteToAdmin(emp.id)} style={{
-                      background: '#2D6A4F', color: 'white',
-                      border: 'none', padding: '7px 10px',
-                      borderRadius: 8, cursor: 'pointer',
-                      fontSize: 12, fontFamily: 'sans-serif',
+                    <button onClick={() => updateRole(emp.id, 'admin')} style={{
+                      background: '#2D6A4F', color: 'white', border: 'none',
+                      padding: '7px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 12,
                     }}>⬆️</button>
                   ) : (
-                    <button onClick={() => demoteToEmployee(emp.id)} style={{
-                      background: '#FFE4E4', color: '#e53e3e',
-                      border: 'none', padding: '7px 10px',
-                      borderRadius: 8, cursor: 'pointer',
-                      fontSize: 12, fontFamily: 'sans-serif',
+                    <button onClick={() => updateRole(emp.id, 'employee')} style={{
+                      background: '#FFE4E4', color: '#e53e3e', border: 'none',
+                      padding: '7px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 12,
                     }}>⬇️</button>
                   )}
+                  <button onClick={() => deleteEmployee(emp.id, emp.name)} style={{
+                    background: '#fee2e2', color: '#e53e3e', border: 'none',
+                    padding: '7px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 12,
+                  }}>🗑️</button>
                 </div>
               </div>
             ))}
           </div>
         )}
 
-        {/* TABLEAU PAIEMENTS */}
+        {/* ONGLET PAIEMENTS */}
         {activeTab === 'payments' && (
           <div style={{ background: 'white', borderRadius: 14, border: '1px solid #E8D5B0', overflow: 'hidden' }}>
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid #F5ECD7', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{
+              padding: '16px 20px', borderBottom: '1px solid #F5ECD7',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            }}>
               <h2 style={{ fontFamily: 'Georgia, serif', color: '#3A1F0A', fontSize: 17, margin: 0 }}>
-                💰 Gestion des paiements
+                💰 Paiements du mois
               </h2>
               <div style={{ fontSize: 13, color: '#7A5C42' }}>
-                Total à payer: <strong style={{ color: '#e53e3e' }}>{totalSalaries.toLocaleString('fr-FR')} FCFA</strong>
+                Total: <strong style={{ color: '#e53e3e' }}>{totalSalaries.toLocaleString('fr-FR')} FCFA</strong>
               </div>
             </div>
-            {employees.map((emp, i) => {
+            {employees.length === 0 ? (
+              <div style={{ padding: 40, textAlign: 'center', color: '#7A5C42' }}>Aucun employé.</div>
+            ) : employees.map((emp, i) => {
               const montant = emp.payment_type === 'salary'
                 ? emp.salary
                 : Math.round(totalRevenue * emp.percentage / 100)
               return (
                 <div key={emp.id} style={{
-                  display: 'flex', alignItems: 'center',
-                  gap: 14, padding: '16px 20px',
+                  display: 'flex', alignItems: 'center', gap: 14,
+                  padding: '16px 20px',
                   borderBottom: i < employees.length - 1 ? '1px solid #F5ECD7' : 'none',
                 }}>
                   <div style={{
                     width: 44, height: 44, borderRadius: '50%',
                     background: emp.role === 'admin' ? '#2D6A4F' : '#8B5E3C',
-                    display: 'flex', alignItems: 'center',
-                    justifyContent: 'center', color: 'white',
-                    fontWeight: 700, fontSize: 18, flexShrink: 0,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: 'white', fontWeight: 700, fontSize: 18, flexShrink: 0,
                   }}>
                     {emp.name[0]}
                   </div>
@@ -247,26 +375,17 @@ export default function SuperAdmin() {
                       {emp.payment_type === 'salary' ? '💵 Salaire fixe' : `📊 ${emp.percentage}% des bénéfices`}
                     </div>
                   </div>
-                  <div style={{ textAlign: 'right', marginRight: 16 }}>
+                  <div style={{ textAlign: 'right', marginRight: 12 }}>
                     <div style={{ fontSize: 16, fontWeight: 700, color: '#2D6A4F' }}>
                       {montant.toLocaleString('fr-FR')} FCFA
                     </div>
                     <div style={{ fontSize: 11, color: '#7A5C42' }}>Ce mois</div>
                   </div>
-                  <button
-                    onClick={() => {
-                      if (confirm(`Payer ${montant.toLocaleString('fr-FR')} FCFA à ${emp.name} ?`)) {
-                        alert(`✅ Paiement de ${montant.toLocaleString('fr-FR')} FCFA envoyé à ${emp.name} !`)
-                      }
-                    }}
-                    style={{
-                      background: '#2D6A4F', color: 'white',
-                      border: 'none', padding: '8px 16px',
-                      borderRadius: 20, cursor: 'pointer',
-                      fontSize: 13, fontWeight: 700,
-                      fontFamily: 'sans-serif',
-                    }}
-                  >
+                  <button onClick={() => showMsg(`✅ Paiement de ${montant.toLocaleString('fr-FR')} FCFA envoyé à ${emp.name} !`, 'success')} style={{
+                    background: '#2D6A4F', color: 'white', border: 'none',
+                    padding: '8px 16px', borderRadius: 20, cursor: 'pointer',
+                    fontSize: 13, fontWeight: 700,
+                  }}>
                     💸 Payer
                   </button>
                 </div>
@@ -274,166 +393,280 @@ export default function SuperAdmin() {
             })}
           </div>
         )}
+
+        {/* ONGLET STATS */}
+        {activeTab === 'stats' && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            {[
+              { icon: '💰', label: 'Revenus totaux', value: totalRevenue.toLocaleString('fr-FR') + ' FCFA', color: '#2D6A4F' },
+              { icon: '💸', label: 'Masse salariale', value: totalSalaries.toLocaleString('fr-FR') + ' FCFA', color: '#e53e3e' },
+              { icon: '📦', label: 'Commandes totales', value: totalOrders, color: '#C9860A' },
+              { icon: '👤', label: 'Clients inscrits', value: totalUsers, color: '#3A1F0A' },
+              { icon: '👥', label: 'Total employés', value: employees.length, color: '#8B5E3C' },
+              { icon: '⚙️', label: 'Admins', value: employees.filter(e => e.role === 'admin').length, color: '#2D6A4F' },
+            ].map((s) => (
+              <div key={s.label} style={{
+                background: 'white', borderRadius: 14,
+                padding: 20, border: '1px solid #E8D5B0',
+              }}>
+                <div style={{ fontSize: 28, marginBottom: 8 }}>{s.icon}</div>
+                <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.value}</div>
+                <div style={{ fontSize: 13, color: '#7A5C42', marginTop: 4 }}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
+
+      {/* MODAL AJOUTER EMPLOYÉ */}
+      {showAddModal && (
+        <div onClick={() => setShowAddModal(false)} style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+          zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+        }}>
+          <div onClick={(e) => e.stopPropagation()} style={{
+            background: 'white', borderRadius: 20, padding: 28,
+            width: '100%', maxWidth: 400,
+          }}>
+            <h3 style={{ fontFamily: 'Georgia, serif', color: '#3A1F0A', fontSize: 18, margin: '0 0 20px' }}>
+              ➕ Ajouter un employé
+            </h3>
+            {[
+              { label: 'Nom complet', key: 'name', type: 'text', placeholder: 'Amadou Diallo' },
+              { label: 'Email', key: 'email', type: 'email', placeholder: 'amadou@gmail.com' },
+            ].map((field) => (
+              <div key={field.key} style={{ marginBottom: 14 }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#7A5C42', display: 'block', marginBottom: 4, textTransform: 'uppercase' }}>
+                  {field.label}
+                </label>
+                <input
+                  type={field.type}
+                  placeholder={field.placeholder}
+                  value={(newEmployee as any)[field.key]}
+                  onChange={(e) => setNewEmployee({ ...newEmployee, [field.key]: e.target.value })}
+                  style={{
+                    width: '100%', padding: '10px 14px',
+                    border: '1.5px solid #E8D5B0', borderRadius: 8,
+                    fontSize: 14, boxSizing: 'border-box' as const,
+                  }}
+                />
+              </div>
+            ))}
+
+            {/* RÔLE */}
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: '#7A5C42', display: 'block', marginBottom: 4, textTransform: 'uppercase' }}>
+                Rôle
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                {(['employee', 'admin'] as const).map((r) => (
+                  <div key={r} onClick={() => setNewEmployee({ ...newEmployee, role: r })} style={{
+                    border: `2px solid ${newEmployee.role === r ? '#2D6A4F' : '#E8D5B0'}`,
+                    background: newEmployee.role === r ? '#D8F3DC' : 'white',
+                    borderRadius: 8, padding: '10px', textAlign: 'center',
+                    cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                    color: newEmployee.role === r ? '#2D6A4F' : '#7A5C42',
+                  }}>
+                    {r === 'employee' ? '👤 Employé' : '⚙️ Admin'}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* TYPE PAIEMENT */}
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: '#7A5C42', display: 'block', marginBottom: 4, textTransform: 'uppercase' }}>
+                Type de paiement
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                {(['salary', 'percentage'] as const).map((t) => (
+                  <div key={t} onClick={() => setNewEmployee({ ...newEmployee, payment_type: t })} style={{
+                    border: `2px solid ${newEmployee.payment_type === t ? '#2D6A4F' : '#E8D5B0'}`,
+                    background: newEmployee.payment_type === t ? '#D8F3DC' : 'white',
+                    borderRadius: 8, padding: '10px', textAlign: 'center',
+                    cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                    color: newEmployee.payment_type === t ? '#2D6A4F' : '#7A5C42',
+                  }}>
+                    {t === 'salary' ? '💵 Salaire fixe' : '📊 Commission'}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* MONTANT */}
+            {newEmployee.payment_type === 'salary' ? (
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#7A5C42', display: 'block', marginBottom: 4, textTransform: 'uppercase' }}>
+                  Salaire (FCFA)
+                </label>
+                <input
+                  type="number"
+                  placeholder="150000"
+                  value={newEmployee.salary || ''}
+                  onChange={(e) => setNewEmployee({ ...newEmployee, salary: parseInt(e.target.value) || 0 })}
+                  style={{
+                    width: '100%', padding: '10px 14px',
+                    border: '1.5px solid #E8D5B0', borderRadius: 8,
+                    fontSize: 14, boxSizing: 'border-box' as const,
+                  }}
+                />
+              </div>
+            ) : (
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#7A5C42', display: 'block', marginBottom: 4, textTransform: 'uppercase' }}>
+                  Pourcentage (%)
+                </label>
+                <input
+                  type="number"
+                  placeholder="10"
+                  min="1" max="50"
+                  value={newEmployee.percentage || ''}
+                  onChange={(e) => setNewEmployee({ ...newEmployee, percentage: parseInt(e.target.value) || 0 })}
+                  style={{
+                    width: '100%', padding: '10px 14px',
+                    border: '1.5px solid #E8D5B0', borderRadius: 8,
+                    fontSize: 14, boxSizing: 'border-box' as const,
+                  }}
+                />
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => setShowAddModal(false)} style={{
+                flex: 1, padding: '12px', background: '#F5ECD7',
+                color: '#3A1F0A', border: '1px solid #E8D5B0',
+                borderRadius: 12, fontSize: 14, fontWeight: 700, cursor: 'pointer',
+              }}>Annuler</button>
+              <button onClick={addEmployee} style={{
+                flex: 2, padding: '12px', background: '#2D6A4F',
+                color: 'white', border: 'none',
+                borderRadius: 12, fontSize: 14, fontWeight: 700, cursor: 'pointer',
+              }}>✅ Ajouter</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MODAL QR CODE */}
       {selectedQR && (
-        <div style={{
-          position: 'fixed', inset: 0,
-          background: 'rgba(0,0,0,0.6)',
-          display: 'flex', alignItems: 'center',
-          justifyContent: 'center', zIndex: 1000, padding: 24,
-        }} onClick={() => setSelectedQR(null)}>
-          <div style={{
-            background: 'white', borderRadius: 20,
-            padding: 32, textAlign: 'center',
-            maxWidth: 340, width: '100%',
-          }} onClick={(e) => e.stopPropagation()}>
-            <h2 style={{ fontFamily: 'Georgia, serif', color: '#3A1F0A', fontSize: 20, marginBottom: 4 }}>
+        <div onClick={() => setSelectedQR(null)} style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+          zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+        }}>
+          <div onClick={(e) => e.stopPropagation()} style={{
+            background: 'white', borderRadius: 20, padding: 28,
+            textAlign: 'center', maxWidth: 320, width: '100%',
+          }}>
+            <h3 style={{ fontFamily: 'Georgia, serif', color: '#3A1F0A', fontSize: 18, margin: '0 0 4px' }}>
               📱 QR Code
-            </h2>
-            <p style={{ color: '#7A5C42', fontSize: 13, marginBottom: 24 }}>{selectedQR.name}</p>
-            <div style={{ position: 'relative', display: 'inline-block' }}>
-              <QRCode
-                value={`baobab-shop://employee/${selectedQR.id}/${selectedQR.email}`}
-                size={220}
-                fgColor="#3A1F0A"
-                bgColor="white"
-              />
-              <div style={{
-                position: 'absolute', top: '50%', left: '50%',
-                transform: 'translate(-50%, -50%)',
-                background: 'white', padding: 6,
-                borderRadius: 8, width: 48, height: 48,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>
-                <img src="/baobab-logo.png" alt="Baobab" style={{ width: 40, height: 40, objectFit: 'contain' }} />
-              </div>
-            </div>
-            <button onClick={() => setSelectedQR(null)} style={{
-              marginTop: 20, width: '100%', background: '#3A1F0A',
-              color: 'white', border: 'none', padding: '12px',
-              borderRadius: 20, cursor: 'pointer', fontWeight: 700,
-              fontSize: 14, fontFamily: 'sans-serif',
+            </h3>
+            <p style={{ color: '#7A5C42', fontSize: 13, margin: '0 0 16px' }}>{selectedQR.name}</p>
+            <div style={{
+              display: 'inline-block', border: '2px solid #E8D5B0',
+              borderRadius: 12, padding: 8, marginBottom: 12,
             }}>
-              Fermer
-            </button>
+              <canvas ref={qrCanvasRef} style={{ display: 'block', width: 220, height: 220 }} />
+            </div>
+            <p style={{ fontSize: 10, color: '#9A7B5A', margin: '0 0 16px', wordBreak: 'break-all', fontFamily: 'monospace' }}>
+              {selectedQR.id}
+            </p>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={downloadQR} style={{
+                flex: 1, padding: '10px', background: '#2D6A4F',
+                color: 'white', border: 'none', borderRadius: 12,
+                fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              }}>⬇️ Télécharger</button>
+              <button onClick={() => setSelectedQR(null)} style={{
+                flex: 1, padding: '10px', background: '#F5ECD7',
+                color: '#3A1F0A', border: '1px solid #E8D5B0',
+                borderRadius: 12, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              }}>Fermer</button>
+            </div>
           </div>
         </div>
       )}
 
       {/* MODAL PAIEMENT */}
       {selectedPay && (
-        <div style={{
-          position: 'fixed', inset: 0,
-          background: 'rgba(0,0,0,0.6)',
-          display: 'flex', alignItems: 'center',
-          justifyContent: 'center', zIndex: 1000, padding: 24,
-        }} onClick={() => setSelectedPay(null)}>
-          <div style={{
-            background: 'white', borderRadius: 20,
-            padding: 32, maxWidth: 400, width: '100%',
-          }} onClick={(e) => e.stopPropagation()}>
-            <h2 style={{ fontFamily: 'Georgia, serif', color: '#3A1F0A', fontSize: 20, marginBottom: 4 }}>
+        <div onClick={() => setSelectedPay(null)} style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+          zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+        }}>
+          <div onClick={(e) => e.stopPropagation()} style={{
+            background: 'white', borderRadius: 20, padding: 28,
+            maxWidth: 400, width: '100%',
+          }}>
+            <h3 style={{ fontFamily: 'Georgia, serif', color: '#3A1F0A', fontSize: 18, margin: '0 0 4px' }}>
               💰 Mode de paiement
-            </h2>
-            <p style={{ color: '#7A5C42', fontSize: 13, marginBottom: 24 }}>{selectedPay.name}</p>
-
-            {/* CHOIX TYPE */}
+            </h3>
+            <p style={{ color: '#7A5C42', fontSize: 13, margin: '0 0 20px' }}>{selectedPay.name}</p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
-              <div
-                onClick={() => setSelectedPay({ ...selectedPay, payment_type: 'salary' })}
-                style={{
-                  border: `2px solid ${selectedPay.payment_type === 'salary' ? '#2D6A4F' : '#E8D5B0'}`,
-                  borderRadius: 12, padding: 16, textAlign: 'center',
-                  cursor: 'pointer',
-                  background: selectedPay.payment_type === 'salary' ? '#D8F3DC' : 'white',
-                }}
-              >
-                <div style={{ fontSize: 28, marginBottom: 6 }}>💵</div>
-                <div style={{ fontWeight: 700, fontSize: 14, color: '#2C1A0E' }}>Salaire fixe</div>
-                <div style={{ fontSize: 11, color: '#7A5C42', marginTop: 2 }}>Montant mensuel fixe</div>
-              </div>
-              <div
-                onClick={() => setSelectedPay({ ...selectedPay, payment_type: 'percentage' })}
-                style={{
-                  border: `2px solid ${selectedPay.payment_type === 'percentage' ? '#2D6A4F' : '#E8D5B0'}`,
-                  borderRadius: 12, padding: 16, textAlign: 'center',
-                  cursor: 'pointer',
-                  background: selectedPay.payment_type === 'percentage' ? '#D8F3DC' : 'white',
-                }}
-              >
-                <div style={{ fontSize: 28, marginBottom: 6 }}>📊</div>
-                <div style={{ fontWeight: 700, fontSize: 14, color: '#2C1A0E' }}>Commission</div>
-                <div style={{ fontSize: 11, color: '#7A5C42', marginTop: 2 }}>% des bénéfices</div>
-              </div>
+              {(['salary', 'percentage'] as const).map((t) => (
+                <div key={t} onClick={() => setSelectedPay({ ...selectedPay, payment_type: t })} style={{
+                  border: `2px solid ${selectedPay.payment_type === t ? '#2D6A4F' : '#E8D5B0'}`,
+                  background: selectedPay.payment_type === t ? '#D8F3DC' : 'white',
+                  borderRadius: 12, padding: 16, textAlign: 'center', cursor: 'pointer',
+                }}>
+                  <div style={{ fontSize: 28, marginBottom: 6 }}>{t === 'salary' ? '💵' : '📊'}</div>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: '#2C1A0E' }}>
+                    {t === 'salary' ? 'Salaire fixe' : 'Commission'}
+                  </div>
+                </div>
+              ))}
             </div>
-
-            {/* INPUT MONTANT */}
             {selectedPay.payment_type === 'salary' ? (
               <div style={{ marginBottom: 20 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: '#7A5C42', display: 'block', marginBottom: 6 }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#7A5C42', display: 'block', marginBottom: 6, textTransform: 'uppercase' }}>
                   Salaire mensuel (FCFA)
                 </label>
                 <input
                   type="number"
                   value={selectedPay.salary}
                   onChange={(e) => setSelectedPay({ ...selectedPay, salary: parseInt(e.target.value) || 0 })}
-                  placeholder="Ex: 150000"
                   style={{
                     width: '100%', padding: '12px 14px',
                     border: '1.5px solid #E8D5B0', borderRadius: 8,
-                    fontSize: 16, fontFamily: 'sans-serif',
-                    boxSizing: 'border-box' as const,
+                    fontSize: 16, boxSizing: 'border-box' as const,
                   }}
                 />
               </div>
             ) : (
               <div style={{ marginBottom: 20 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: '#7A5C42', display: 'block', marginBottom: 6 }}>
-                  Pourcentage des bénéfices (%)
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#7A5C42', display: 'block', marginBottom: 6, textTransform: 'uppercase' }}>
+                  Pourcentage (%)
                 </label>
                 <input
                   type="number"
                   value={selectedPay.percentage}
                   onChange={(e) => setSelectedPay({ ...selectedPay, percentage: parseInt(e.target.value) || 0 })}
-                  placeholder="Ex: 10"
                   min="1" max="50"
                   style={{
                     width: '100%', padding: '12px 14px',
                     border: '1.5px solid #E8D5B0', borderRadius: 8,
-                    fontSize: 16, fontFamily: 'sans-serif',
-                    boxSizing: 'border-box' as const,
+                    fontSize: 16, boxSizing: 'border-box' as const,
                   }}
                 />
                 <p style={{ fontSize: 12, color: '#7A5C42', marginTop: 6 }}>
-                  💡 Revenus ce mois: {totalRevenue.toLocaleString('fr-FR')} FCFA →
-                  Montant: {Math.round(totalRevenue * selectedPay.percentage / 100).toLocaleString('fr-FR')} FCFA
+                  💡 Montant estimé: {Math.round(totalRevenue * selectedPay.percentage / 100).toLocaleString('fr-FR')} FCFA
                 </p>
               </div>
             )}
-
             <div style={{ display: 'flex', gap: 10 }}>
               <button onClick={() => setSelectedPay(null)} style={{
-                flex: 1, background: '#F5ECD7', color: '#5C3317',
-                border: '1.5px solid #E8D5B0', padding: '12px',
-                borderRadius: 20, cursor: 'pointer', fontWeight: 600,
-                fontSize: 14, fontFamily: 'sans-serif',
-              }}>
-                Annuler
-              </button>
+                flex: 1, padding: '12px', background: '#F5ECD7',
+                color: '#3A1F0A', border: '1px solid #E8D5B0',
+                borderRadius: 20, fontSize: 14, fontWeight: 700, cursor: 'pointer',
+              }}>Annuler</button>
               <button onClick={() => updatePayment(selectedPay)} style={{
-                flex: 2, background: '#2D6A4F', color: 'white',
-                border: 'none', padding: '12px',
-                borderRadius: 20, cursor: 'pointer', fontWeight: 700,
-                fontSize: 14, fontFamily: 'sans-serif',
-              }}>
-                ✅ Sauvegarder
-              </button>
+                flex: 2, padding: '12px', background: '#2D6A4F',
+                color: 'white', border: 'none',
+                borderRadius: 20, fontSize: 14, fontWeight: 700, cursor: 'pointer',
+              }}>✅ Sauvegarder</button>
             </div>
           </div>
         </div>
       )}
+
     </div>
   )
 }

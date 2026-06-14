@@ -1,18 +1,27 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { getCartCount } from '@/lib/cart'
 
 export default function BottomNav() {
   const pathname = usePathname()
+  const [cartCount, setCartCount] = useState(0)
+
+  useEffect(() => {
+    setCartCount(getCartCount())
+    const handleUpdate = () => setCartCount(getCartCount())
+    window.addEventListener('cartUpdated', handleUpdate)
+    return () => window.removeEventListener('cartUpdated', handleUpdate)
+  }, [])
 
   const tabs = [
     { href: '/', icon: '🏠', label: 'Accueil' },
     { href: '/electronique', icon: '📦', label: 'Catégories' },
     { href: '/messages', icon: '💬', label: 'Messagerie', badge: 3 },
-    { href: '/panier', icon: '🛒', label: 'Panier', badge: 0 },
+    { href: '/panier', icon: '🛒', label: 'Panier', badge: cartCount },
     { href: '/profil', icon: '👤', label: 'Mon Compte' },
   ]
-
   return (
     <nav style={{
       position: 'fixed',

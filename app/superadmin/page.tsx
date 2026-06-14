@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
+import { Html5QrcodeScanner } from 'html5-qrcode'
 
 interface Employee {
   id: string
@@ -22,11 +23,13 @@ export default function SuperAdmin() {
   const [selectedQR, setSelectedQR] = useState<Employee | null>(null)
   const [selectedPay, setSelectedPay] = useState<Employee | null>(null)
   const [showAddModal, setShowAddModal] = useState(false)
-  const [activeTab, setActiveTab] = useState<'employees' | 'payments' | 'stats'>('employees')
+  const [activeTab, setActiveTab] = useState<'employees' | 'payments' | 'stats' | 'scanner'>('employees')
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
   const [totalRevenue, setTotalRevenue] = useState(0)
   const [totalOrders, setTotalOrders] = useState(0)
   const [totalUsers, setTotalUsers] = useState(0)
+  const [scanResult, setScanResult] = useState<string | null>(null)
+  const [scannedEmployee, setScannedEmployee] = useState<Employee | null>(null)
   const [newEmployee, setNewEmployee] = useState({
     name: '', email: '', role: 'employee' as 'admin' | 'employee',
     payment_type: 'salary' as 'salary' | 'percentage',
@@ -39,12 +42,10 @@ export default function SuperAdmin() {
     setTimeout(() => setMessage(null), 4000)
   }
 
-  // Charger les données
   useEffect(() => {
     const init = async () => {
       const { data: authData } = await supabase.auth.getUser()
       setUser(authData.user)
-
       if (authData.user?.email === SUPER_ADMIN_EMAIL) {
         await loadEmployees()
         await loadStats()
@@ -87,6 +88,37 @@ export default function SuperAdmin() {
     }
   }, [selectedQR])
 
+  // Scanner QR
+  useEffect(() => {
+    if (activeTab !== 'scanner' || scanResult) return
+
+    let scanner: Html5QrcodeScanner | null = null
+
+    const timeout = setTimeout(() => {
+      scanner = new Html5QrcodeScanner('qr-reader', {
+        fps: 10,
+        qrbox: { width: 250, height: 250 },
+      }, false)
+
+      scanner.render(
+        (decodedText) => {
+          setScanResult(decodedText)
+          scanner?.clear().catch(() => {})
+          const parts = decodedText.split('/')
+          const employeeId = parts[3]
+          const found = employees.find(e => e.id === employeeId)
+          setScannedEmployee(found || null)
+        },
+        () => {}
+      )
+    }, 300)
+
+    return () => {
+      clearTimeout(timeout)
+      scanner?.clear().catch(() => {})
+    }
+  }, [activeTab, scanResult, employees])
+
   const loadEmployees = async () => {
     const { data, error } = await supabase
       .from('employees').select('*').order('created_at', { ascending: false })
@@ -95,13 +127,11 @@ export default function SuperAdmin() {
   }
 
   const loadStats = async () => {
-    // Commandes
     const { data: orders } = await supabase.from('orders').select('total')
     if (orders) {
       setTotalOrders(orders.length)
       setTotalRevenue(orders.reduce((sum, o) => sum + (o.total || 0), 0))
     }
-    // Utilisateurs (profiles)
     const { count } = await supabase.from('profiles').select('*', { count: 'exact', head: true })
     setTotalUsers(count || 0)
   }
@@ -109,10 +139,8 @@ export default function SuperAdmin() {
   const addEmployee = async () => {
     if (!newEmployee.name || !newEmployee.email)
       return showMsg('❌ Nom et email obligatoires !', 'error')
-
     const { error } = await supabase.from('employees').insert([newEmployee])
     if (error) return showMsg('❌ Erreur: ' + error.message, 'error')
-
     showMsg('✅ Employé ajouté !', 'success')
     setShowAddModal(false)
     setNewEmployee({ name: '', email: '', role: 'employee', payment_type: 'salary', salary: 0, percentage: 0 })
@@ -130,17 +158,14 @@ export default function SuperAdmin() {
   const updateRole = async (id: string, role: 'admin' | 'employee') => {
     const { error } = await supabase.from('employees').update({ role }).eq('id', id)
     if (error) return showMsg('❌ Erreur mise à jour', 'error')
-    showMsg(`✅ Rôle mis à jour !`, 'success')
+    showMsg('✅ Rôle mis à jour !', 'success')
     await loadEmployees()
   }
 
   const updatePayment = async (emp: Employee) => {
     const { error } = await supabase.from('employees')
-      .update({
-        payment_type: emp.payment_type,
-        salary: emp.salary,
-        percentage: emp.percentage,
-      }).eq('id', emp.id)
+      .update({ payment_type: emp.payment_type, salary: emp.salary, percentage: emp.percentage })
+      .eq('id', emp.id)
     if (error) return showMsg('❌ Erreur mise à jour paiement', 'error')
     showMsg('✅ Paiement mis à jour !', 'success')
     setSelectedPay(null)
@@ -223,8 +248,7 @@ export default function SuperAdmin() {
           ].map((s) => (
             <div key={s.label} style={{
               background: 'white', borderRadius: 12,
-              padding: 16, textAlign: 'center',
-              border: '1px solid #E8D5B0',
+              padding: 16, textAlign: 'center', border: '1px solid #E8D5B0',
             }}>
               <div style={{ fontSize: 24 }}>{s.icon}</div>
               <div style={{ fontSize: 18, fontWeight: 700, color: '#3A1F0A', marginTop: 4 }}>{s.value}</div>
@@ -234,13 +258,18 @@ export default function SuperAdmin() {
         </div>
 
         {/* TABS */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
           {[
             { key: 'employees', label: '👥 Employés' },
             { key: 'payments', label: '💰 Paiements' },
             { key: 'stats', label: '📊 Statistiques' },
+            { key: 'scanner', label: '📷 Scanner' },
           ].map((tab) => (
-            <button key={tab.key} onClick={() => setActiveTab(tab.key as any)} style={{
+            <button key={tab.key} onClick={() => {
+              setActiveTab(tab.key as any)
+              setScanResult(null)
+              setScannedEmployee(null)
+            }} style={{
               padding: '9px 20px', borderRadius: 20, border: '1.5px solid',
               borderColor: activeTab === tab.key ? '#3A1F0A' : '#E8D5B0',
               background: activeTab === tab.key ? '#3A1F0A' : 'white',
@@ -266,19 +295,15 @@ export default function SuperAdmin() {
                 background: '#2D6A4F', color: 'white', border: 'none',
                 padding: '8px 16px', borderRadius: 20, cursor: 'pointer',
                 fontSize: 13, fontWeight: 700,
-              }}>
-                ➕ Ajouter
-              </button>
+              }}>➕ Ajouter</button>
             </div>
-
             {employees.length === 0 ? (
               <div style={{ padding: 40, textAlign: 'center', color: '#7A5C42' }}>
                 Aucun employé. Cliquez sur ➕ Ajouter.
               </div>
             ) : employees.map((emp, i) => (
               <div key={emp.id} style={{
-                display: 'flex', alignItems: 'center', gap: 14,
-                padding: '16px 20px',
+                display: 'flex', alignItems: 'center', gap: 14, padding: '16px 20px',
                 borderBottom: i < employees.length - 1 ? '1px solid #F5ECD7' : 'none',
               }}>
                 <div style={{
@@ -357,8 +382,7 @@ export default function SuperAdmin() {
                 : Math.round(totalRevenue * emp.percentage / 100)
               return (
                 <div key={emp.id} style={{
-                  display: 'flex', alignItems: 'center', gap: 14,
-                  padding: '16px 20px',
+                  display: 'flex', alignItems: 'center', gap: 14, padding: '16px 20px',
                   borderBottom: i < employees.length - 1 ? '1px solid #F5ECD7' : 'none',
                 }}>
                   <div style={{
@@ -385,9 +409,7 @@ export default function SuperAdmin() {
                     background: '#2D6A4F', color: 'white', border: 'none',
                     padding: '8px 16px', borderRadius: 20, cursor: 'pointer',
                     fontSize: 13, fontWeight: 700,
-                  }}>
-                    💸 Payer
-                  </button>
+                  }}>💸 Payer</button>
                 </div>
               )
             })}
@@ -406,14 +428,100 @@ export default function SuperAdmin() {
               { icon: '⚙️', label: 'Admins', value: employees.filter(e => e.role === 'admin').length, color: '#2D6A4F' },
             ].map((s) => (
               <div key={s.label} style={{
-                background: 'white', borderRadius: 14,
-                padding: 20, border: '1px solid #E8D5B0',
+                background: 'white', borderRadius: 14, padding: 20, border: '1px solid #E8D5B0',
               }}>
                 <div style={{ fontSize: 28, marginBottom: 8 }}>{s.icon}</div>
                 <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.value}</div>
                 <div style={{ fontSize: 13, color: '#7A5C42', marginTop: 4 }}>{s.label}</div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* ONGLET SCANNER */}
+        {activeTab === 'scanner' && (
+          <div style={{ background: 'white', borderRadius: 14, border: '1px solid #E8D5B0', overflow: 'hidden' }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid #F5ECD7' }}>
+              <h2 style={{ fontFamily: 'Georgia, serif', color: '#3A1F0A', fontSize: 17, margin: 0 }}>
+                📷 Scanner QR Code
+              </h2>
+            </div>
+            <div style={{ padding: 24 }}>
+              {!scanResult ? (
+                <div>
+                  <p style={{ fontSize: 13, color: '#7A5C42', marginBottom: 16, textAlign: 'center' }}>
+                    Pointez la caméra vers le QR code d'un employé
+                  </p>
+                  <div id="qr-reader" style={{ width: '100%', maxWidth: 400, margin: '0 auto' }} />
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center' }}>
+                  {scannedEmployee ? (
+                    <div style={{
+                      background: '#D8F3DC', border: '1px solid #6ee7b7',
+                      borderRadius: 14, padding: 24, maxWidth: 360, margin: '0 auto',
+                    }}>
+                      <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
+                      <h3 style={{ color: '#2D6A4F', fontFamily: 'Georgia, serif', margin: '0 0 16px' }}>
+                        Employé identifié !
+                      </h3>
+                      <div style={{ background: 'white', borderRadius: 12, padding: 16, textAlign: 'left', marginBottom: 16 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                          <div style={{
+                            width: 48, height: 48, borderRadius: '50%',
+                            background: scannedEmployee.role === 'admin' ? '#2D6A4F' : '#8B5E3C',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            color: 'white', fontWeight: 700, fontSize: 20,
+                          }}>
+                            {scannedEmployee.name[0]}
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: 16, color: '#2C1A0E' }}>{scannedEmployee.name}</div>
+                            <div style={{ fontSize: 13, color: '#7A5C42' }}>{scannedEmployee.email}</div>
+                          </div>
+                        </div>
+                        {[
+                          { label: 'Rôle', value: scannedEmployee.role === 'admin' ? '⚙️ Admin' : '👤 Employé' },
+                          { label: 'Paiement', value: scannedEmployee.payment_type === 'salary'
+                            ? `💵 ${scannedEmployee.salary.toLocaleString('fr-FR')} FCFA`
+                            : `📊 ${scannedEmployee.percentage}% des bénéfices` },
+                          { label: 'Ajouté le', value: new Date(scannedEmployee.created_at).toLocaleDateString('fr-FR') },
+                        ].map((item) => (
+                          <div key={item.label} style={{
+                            display: 'flex', justifyContent: 'space-between',
+                            padding: '8px 0', borderBottom: '1px solid #F5ECD7', fontSize: 13,
+                          }}>
+                            <span style={{ color: '#7A5C42', fontWeight: 600 }}>{item.label}</span>
+                            <span style={{ color: '#2C1A0E', fontWeight: 600 }}>{item.value}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{
+                      background: '#fee2e2', border: '1px solid #fca5a5',
+                      borderRadius: 14, padding: 24, maxWidth: 360, margin: '0 auto',
+                    }}>
+                      <div style={{ fontSize: 48, marginBottom: 12 }}>❌</div>
+                      <h3 style={{ color: '#991b1b', fontFamily: 'Georgia, serif', margin: '0 0 8px' }}>
+                        Employé non trouvé
+                      </h3>
+                      <p style={{ fontSize: 13, color: '#7A5C42', margin: '0 0 16px', wordBreak: 'break-all' }}>
+                        {scanResult}
+                      </p>
+                    </div>
+                  )}
+                  <button onClick={() => { setScanResult(null); setScannedEmployee(null) }} style={{
+                    marginTop: 20, padding: '12px 32px',
+                    background: '#3A1F0A', color: 'white',
+                    border: 'none', borderRadius: 20,
+                    fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                  }}>
+                    📷 Scanner à nouveau
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -425,8 +533,7 @@ export default function SuperAdmin() {
           zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
         }}>
           <div onClick={(e) => e.stopPropagation()} style={{
-            background: 'white', borderRadius: 20, padding: 28,
-            width: '100%', maxWidth: 400,
+            background: 'white', borderRadius: 20, padding: 28, width: '100%', maxWidth: 400,
           }}>
             <h3 style={{ fontFamily: 'Georgia, serif', color: '#3A1F0A', fontSize: 18, margin: '0 0 20px' }}>
               ➕ Ajouter un employé
@@ -436,7 +543,7 @@ export default function SuperAdmin() {
               { label: 'Email', key: 'email', type: 'email', placeholder: 'amadou@gmail.com' },
             ].map((field) => (
               <div key={field.key} style={{ marginBottom: 14 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: '#7A5C42', display: 'block', marginBottom: 4, textTransform: 'uppercase' }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#7A5C42', display: 'block', marginBottom: 4, textTransform: 'uppercase' as const }}>
                   {field.label}
                 </label>
                 <input
@@ -452,12 +559,8 @@ export default function SuperAdmin() {
                 />
               </div>
             ))}
-
-            {/* RÔLE */}
             <div style={{ marginBottom: 14 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: '#7A5C42', display: 'block', marginBottom: 4, textTransform: 'uppercase' }}>
-                Rôle
-              </label>
+              <label style={{ fontSize: 12, fontWeight: 600, color: '#7A5C42', display: 'block', marginBottom: 4, textTransform: 'uppercase' as const }}>Rôle</label>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                 {(['employee', 'admin'] as const).map((r) => (
                   <div key={r} onClick={() => setNewEmployee({ ...newEmployee, role: r })} style={{
@@ -472,12 +575,8 @@ export default function SuperAdmin() {
                 ))}
               </div>
             </div>
-
-            {/* TYPE PAIEMENT */}
             <div style={{ marginBottom: 14 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: '#7A5C42', display: 'block', marginBottom: 4, textTransform: 'uppercase' }}>
-                Type de paiement
-              </label>
+              <label style={{ fontSize: 12, fontWeight: 600, color: '#7A5C42', display: 'block', marginBottom: 4, textTransform: 'uppercase' as const }}>Type de paiement</label>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                 {(['salary', 'percentage'] as const).map((t) => (
                   <div key={t} onClick={() => setNewEmployee({ ...newEmployee, payment_type: t })} style={{
@@ -492,55 +591,29 @@ export default function SuperAdmin() {
                 ))}
               </div>
             </div>
-
-            {/* MONTANT */}
             {newEmployee.payment_type === 'salary' ? (
               <div style={{ marginBottom: 20 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: '#7A5C42', display: 'block', marginBottom: 4, textTransform: 'uppercase' }}>
-                  Salaire (FCFA)
-                </label>
-                <input
-                  type="number"
-                  placeholder="150000"
-                  value={newEmployee.salary || ''}
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#7A5C42', display: 'block', marginBottom: 4, textTransform: 'uppercase' as const }}>Salaire (FCFA)</label>
+                <input type="number" placeholder="150000" value={newEmployee.salary || ''}
                   onChange={(e) => setNewEmployee({ ...newEmployee, salary: parseInt(e.target.value) || 0 })}
-                  style={{
-                    width: '100%', padding: '10px 14px',
-                    border: '1.5px solid #E8D5B0', borderRadius: 8,
-                    fontSize: 14, boxSizing: 'border-box' as const,
-                  }}
-                />
+                  style={{ width: '100%', padding: '10px 14px', border: '1.5px solid #E8D5B0', borderRadius: 8, fontSize: 14, boxSizing: 'border-box' as const }} />
               </div>
             ) : (
               <div style={{ marginBottom: 20 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: '#7A5C42', display: 'block', marginBottom: 4, textTransform: 'uppercase' }}>
-                  Pourcentage (%)
-                </label>
-                <input
-                  type="number"
-                  placeholder="10"
-                  min="1" max="50"
-                  value={newEmployee.percentage || ''}
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#7A5C42', display: 'block', marginBottom: 4, textTransform: 'uppercase' as const }}>Pourcentage (%)</label>
+                <input type="number" placeholder="10" min="1" max="50" value={newEmployee.percentage || ''}
                   onChange={(e) => setNewEmployee({ ...newEmployee, percentage: parseInt(e.target.value) || 0 })}
-                  style={{
-                    width: '100%', padding: '10px 14px',
-                    border: '1.5px solid #E8D5B0', borderRadius: 8,
-                    fontSize: 14, boxSizing: 'border-box' as const,
-                  }}
-                />
+                  style={{ width: '100%', padding: '10px 14px', border: '1.5px solid #E8D5B0', borderRadius: 8, fontSize: 14, boxSizing: 'border-box' as const }} />
               </div>
             )}
-
             <div style={{ display: 'flex', gap: 10 }}>
               <button onClick={() => setShowAddModal(false)} style={{
-                flex: 1, padding: '12px', background: '#F5ECD7',
-                color: '#3A1F0A', border: '1px solid #E8D5B0',
-                borderRadius: 12, fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                flex: 1, padding: '12px', background: '#F5ECD7', color: '#3A1F0A',
+                border: '1px solid #E8D5B0', borderRadius: 12, fontSize: 14, fontWeight: 700, cursor: 'pointer',
               }}>Annuler</button>
               <button onClick={addEmployee} style={{
-                flex: 2, padding: '12px', background: '#2D6A4F',
-                color: 'white', border: 'none',
-                borderRadius: 12, fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                flex: 2, padding: '12px', background: '#2D6A4F', color: 'white',
+                border: 'none', borderRadius: 12, fontSize: 14, fontWeight: 700, cursor: 'pointer',
               }}>✅ Ajouter</button>
             </div>
           </div>
@@ -554,17 +627,11 @@ export default function SuperAdmin() {
           zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
         }}>
           <div onClick={(e) => e.stopPropagation()} style={{
-            background: 'white', borderRadius: 20, padding: 28,
-            textAlign: 'center', maxWidth: 320, width: '100%',
+            background: 'white', borderRadius: 20, padding: 28, textAlign: 'center', maxWidth: 320, width: '100%',
           }}>
-            <h3 style={{ fontFamily: 'Georgia, serif', color: '#3A1F0A', fontSize: 18, margin: '0 0 4px' }}>
-              📱 QR Code
-            </h3>
+            <h3 style={{ fontFamily: 'Georgia, serif', color: '#3A1F0A', fontSize: 18, margin: '0 0 4px' }}>📱 QR Code</h3>
             <p style={{ color: '#7A5C42', fontSize: 13, margin: '0 0 16px' }}>{selectedQR.name}</p>
-            <div style={{
-              display: 'inline-block', border: '2px solid #E8D5B0',
-              borderRadius: 12, padding: 8, marginBottom: 12,
-            }}>
+            <div style={{ display: 'inline-block', border: '2px solid #E8D5B0', borderRadius: 12, padding: 8, marginBottom: 12 }}>
               <canvas ref={qrCanvasRef} style={{ display: 'block', width: 220, height: 220 }} />
             </div>
             <p style={{ fontSize: 10, color: '#9A7B5A', margin: '0 0 16px', wordBreak: 'break-all', fontFamily: 'monospace' }}>
@@ -572,14 +639,12 @@ export default function SuperAdmin() {
             </p>
             <div style={{ display: 'flex', gap: 10 }}>
               <button onClick={downloadQR} style={{
-                flex: 1, padding: '10px', background: '#2D6A4F',
-                color: 'white', border: 'none', borderRadius: 12,
-                fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                flex: 1, padding: '10px', background: '#2D6A4F', color: 'white',
+                border: 'none', borderRadius: 12, fontSize: 13, fontWeight: 700, cursor: 'pointer',
               }}>⬇️ Télécharger</button>
               <button onClick={() => setSelectedQR(null)} style={{
-                flex: 1, padding: '10px', background: '#F5ECD7',
-                color: '#3A1F0A', border: '1px solid #E8D5B0',
-                borderRadius: 12, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                flex: 1, padding: '10px', background: '#F5ECD7', color: '#3A1F0A',
+                border: '1px solid #E8D5B0', borderRadius: 12, fontSize: 13, fontWeight: 700, cursor: 'pointer',
               }}>Fermer</button>
             </div>
           </div>
@@ -593,12 +658,9 @@ export default function SuperAdmin() {
           zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
         }}>
           <div onClick={(e) => e.stopPropagation()} style={{
-            background: 'white', borderRadius: 20, padding: 28,
-            maxWidth: 400, width: '100%',
+            background: 'white', borderRadius: 20, padding: 28, maxWidth: 400, width: '100%',
           }}>
-            <h3 style={{ fontFamily: 'Georgia, serif', color: '#3A1F0A', fontSize: 18, margin: '0 0 4px' }}>
-              💰 Mode de paiement
-            </h3>
+            <h3 style={{ fontFamily: 'Georgia, serif', color: '#3A1F0A', fontSize: 18, margin: '0 0 4px' }}>💰 Mode de paiement</h3>
             <p style={{ color: '#7A5C42', fontSize: 13, margin: '0 0 20px' }}>{selectedPay.name}</p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
               {(['salary', 'percentage'] as const).map((t) => (
@@ -616,36 +678,17 @@ export default function SuperAdmin() {
             </div>
             {selectedPay.payment_type === 'salary' ? (
               <div style={{ marginBottom: 20 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: '#7A5C42', display: 'block', marginBottom: 6, textTransform: 'uppercase' }}>
-                  Salaire mensuel (FCFA)
-                </label>
-                <input
-                  type="number"
-                  value={selectedPay.salary}
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#7A5C42', display: 'block', marginBottom: 6, textTransform: 'uppercase' as const }}>Salaire mensuel (FCFA)</label>
+                <input type="number" value={selectedPay.salary}
                   onChange={(e) => setSelectedPay({ ...selectedPay, salary: parseInt(e.target.value) || 0 })}
-                  style={{
-                    width: '100%', padding: '12px 14px',
-                    border: '1.5px solid #E8D5B0', borderRadius: 8,
-                    fontSize: 16, boxSizing: 'border-box' as const,
-                  }}
-                />
+                  style={{ width: '100%', padding: '12px 14px', border: '1.5px solid #E8D5B0', borderRadius: 8, fontSize: 16, boxSizing: 'border-box' as const }} />
               </div>
             ) : (
               <div style={{ marginBottom: 20 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: '#7A5C42', display: 'block', marginBottom: 6, textTransform: 'uppercase' }}>
-                  Pourcentage (%)
-                </label>
-                <input
-                  type="number"
-                  value={selectedPay.percentage}
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#7A5C42', display: 'block', marginBottom: 6, textTransform: 'uppercase' as const }}>Pourcentage (%)</label>
+                <input type="number" value={selectedPay.percentage} min="1" max="50"
                   onChange={(e) => setSelectedPay({ ...selectedPay, percentage: parseInt(e.target.value) || 0 })}
-                  min="1" max="50"
-                  style={{
-                    width: '100%', padding: '12px 14px',
-                    border: '1.5px solid #E8D5B0', borderRadius: 8,
-                    fontSize: 16, boxSizing: 'border-box' as const,
-                  }}
-                />
+                  style={{ width: '100%', padding: '12px 14px', border: '1.5px solid #E8D5B0', borderRadius: 8, fontSize: 16, boxSizing: 'border-box' as const }} />
                 <p style={{ fontSize: 12, color: '#7A5C42', marginTop: 6 }}>
                   💡 Montant estimé: {Math.round(totalRevenue * selectedPay.percentage / 100).toLocaleString('fr-FR')} FCFA
                 </p>
@@ -653,14 +696,12 @@ export default function SuperAdmin() {
             )}
             <div style={{ display: 'flex', gap: 10 }}>
               <button onClick={() => setSelectedPay(null)} style={{
-                flex: 1, padding: '12px', background: '#F5ECD7',
-                color: '#3A1F0A', border: '1px solid #E8D5B0',
-                borderRadius: 20, fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                flex: 1, padding: '12px', background: '#F5ECD7', color: '#3A1F0A',
+                border: '1px solid #E8D5B0', borderRadius: 20, fontSize: 14, fontWeight: 700, cursor: 'pointer',
               }}>Annuler</button>
               <button onClick={() => updatePayment(selectedPay)} style={{
-                flex: 2, padding: '12px', background: '#2D6A4F',
-                color: 'white', border: 'none',
-                borderRadius: 20, fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                flex: 2, padding: '12px', background: '#2D6A4F', color: 'white',
+                border: 'none', borderRadius: 20, fontSize: 14, fontWeight: 700, cursor: 'pointer',
               }}>✅ Sauvegarder</button>
             </div>
           </div>

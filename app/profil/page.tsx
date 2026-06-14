@@ -352,16 +352,7 @@ export default function Profil() {
             <div style={{ fontWeight: 700, fontSize: 16, color: '#1a1a1a', marginBottom: 4 }}>
               {shortName}
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-              <span style={{ fontSize: 13 }}>🇸🇳</span>
-              <span style={{ fontSize: 13, color: '#7A5C42', fontWeight: 600 }}>SN</span>
-              <span style={{ fontSize: 13, color: '#aaa' }}>ⓘ</span>
-            </div>
-            <button style={{
-              background: '#F5F5F5', border: '1px solid #ddd',
-              borderRadius: 20, padding: '4px 12px',
-              fontSize: 12, color: '#555', cursor: 'pointer', fontWeight: 600,
-            }}>+ Type d'acheteur</button>
+            
           </div>
 
           {/* ICÔNE QR */}

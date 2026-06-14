@@ -1,238 +1,136 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { getCart, removeFromCart, updateQuantity, CartItem } from '@/lib/cart'
 
-export default function Paiement() {
-  const [method, setMethod] = useState<'wave' | 'orange' | 'card'>('wave')
-  const [phone, setPhone] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [success, setSuccess] = useState(false)
+export default function Panier() {
   const router = useRouter()
+  const [items, setItems] = useState<CartItem[]>([])
 
-  const total = 312500
+  useEffect(() => {
+    setItems(getCart())
+    const handleUpdate = () => setItems(getCart())
+    window.addEventListener('cartUpdated', handleUpdate)
+    return () => window.removeEventListener('cartUpdated', handleUpdate)
+  }, [])
 
-  const handlePay = async () => {
-    if (method !== 'card' && (!phone || phone.length < 9)) return alert('Entrez un numéro valide !')
-    setLoading(true)
-    setTimeout(() => {
-      setLoading(false)
-      setSuccess(true)
-    }, 2000)
+  const updateQty = (id: string, delta: number) => {
+    const item = items.find(i => i.id === id)
+    if (!item) return
+    const newQty = Math.max(1, item.quantity + delta)
+    updateQuantity(id, newQty)
   }
 
-  const payMethods = [
-    {
-      key: 'wave',
-      icon: (
-        <img
-          src="/wave.png"
-          alt="Wave"
-          style={{ width: 52, height: 52, borderRadius: 14, objectFit: 'cover', display: 'block', margin: '0 auto 8px' }}
-        />
-      ),
-      name: 'Wave',
-      sub: 'Paiement Wave',
-    },
-    {
-      key: 'orange',
-      icon: (
-        <img
-          src="/orange.png"
-          alt="Orange Money"
-          style={{ width: 52, height: 52, borderRadius: 14, objectFit: 'cover', display: 'block', margin: '0 auto 8px' }}
-        />
-      ),
-      name: 'Orange Money',
-      sub: 'Paiement OM',
-    },
-    {
-  key: 'card',
-  icon: (
-    <div style={{ width: 52, height: 52, borderRadius: 14, background: '#1a1a2e', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 8px' }}>
-      <span style={{ fontSize: 28 }}>💳</span>
-    </div>
-  ),
-  name: 'Carte',
-  sub: 'Visa / Mastercard',
-},
-  ]
-
-  if (success) {
-    return (
-      <div style={{
-        background: '#F5ECD7',
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 24,
-      }}>
-        <div style={{ textAlign: 'center', maxWidth: 400 }}>
-          <div style={{ fontSize: 80, marginBottom: 16 }}>✅</div>
-          <h1 style={{ fontFamily: 'Georgia, serif', color: '#2D6A4F', fontSize: 28, marginBottom: 8 }}>
-            Paiement réussi !
-          </h1>
-          <p style={{ color: '#7A5C42', marginBottom: 8 }}>Merci pour votre commande.</p>
-          <p style={{ color: '#7A5C42', fontSize: 13, marginBottom: 32 }}>
-            Vous recevrez une confirmation par SMS au {phone}
-          </p>
-          <button onClick={() => router.push('/')} style={{
-            background: '#2D6A4F', color: 'white', border: 'none',
-            padding: '14px 32px', borderRadius: 24, cursor: 'pointer',
-            fontWeight: 700, fontSize: 16, fontFamily: 'sans-serif',
-          }}>
-            Retour à l'accueil
-          </button>
-        </div>
-      </div>
-    )
+  const removeItem = (id: string) => {
+    removeFromCart(id)
   }
+
+  const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0)
+  const livraison = 2500
+  const total = subtotal + livraison
 
   return (
     <div style={{ background: '#F5ECD7', minHeight: '100vh', padding: 24 }}>
-      <div style={{ maxWidth: 480, margin: '0 auto' }}>
-        <button onClick={() => router.back()} style={{
-          background: 'none', border: 'none', color: '#5C3317',
-          fontSize: 14, fontWeight: 600, cursor: 'pointer',
-          marginBottom: 20, padding: 0, fontFamily: 'sans-serif',
-        }}>
-          ← Retour au panier
-        </button>
-
-        <h1 style={{ fontFamily: 'Georgia, serif', color: '#3A1F0A', fontSize: 28, marginBottom: 24 }}>
-          💳 Paiement
+      <div style={{ maxWidth: 680, margin: '0 auto' }}>
+        <h1 style={{ fontFamily: 'Georgia, serif', color: '#3A1F0A', fontSize: 28, marginBottom: 8 }}>
+          🛒 Mon Panier
         </h1>
+        <p style={{ color: '#7A5C42', marginBottom: 24, fontSize: 13 }}>
+          {items.length} article(s)
+        </p>
 
-        <h2 style={{ fontSize: 15, fontWeight: 700, color: '#3A1F0A', marginBottom: 12 }}>
-          Choisir le mode de paiement
-        </h2>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 24 }}>
-          {payMethods.map((m) => (
-            <div
-              key={m.key}
-              onClick={() => setMethod(m.key as 'wave' | 'orange' | 'card')}
-              style={{
-                border: `2px solid ${method === m.key ? '#2D6A4F' : '#E8D5B0'}`,
-                borderRadius: 12,
-                padding: 12,
-                textAlign: 'center',
-                cursor: 'pointer',
-                background: method === m.key ? '#D8F3DC' : 'white',
-                transition: 'all 0.2s',
-              }}
-            >
-              {m.icon}
-              <div style={{ fontWeight: 700, fontSize: 13, color: '#2C1A0E' }}>{m.name}</div>
-              <div style={{ fontSize: 10, color: '#7A5C42', marginTop: 2 }}>{m.sub}</div>
-            </div>
-          ))}
-        </div>
-
-        {method !== 'card' ? (
-          <div style={{ marginBottom: 20 }}>
-            <label style={{
-              fontSize: 12, fontWeight: 600, color: '#7A5C42',
-              display: 'block', marginBottom: 6,
-              textTransform: 'uppercase', letterSpacing: '0.5px',
-            }}>
-              Numéro {method === 'wave' ? 'Wave' : 'Orange Money'}
-            </label>
-            <input
-              type="tel"
-              placeholder="7X XXX XX XX"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              style={{
-                width: '100%', padding: '12px 16px',
-                border: '1.5px solid #E8D5B0', borderRadius: 8,
-                fontSize: 16, fontFamily: 'sans-serif',
-                background: 'white', boxSizing: 'border-box',
-              }}
-            />
+        {items.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: 60 }}>
+            <div style={{ fontSize: 64, marginBottom: 16 }}>🛒</div>
+            <p style={{ color: '#7A5C42', fontSize: 16, marginBottom: 8 }}>Panier vide</p>
+            <Link href="/" style={{
+              display: 'inline-block', background: '#2D6A4F', color: 'white',
+              padding: '12px 24px', borderRadius: 20, textDecoration: 'none', fontWeight: 600,
+            }}>Continuer les achats</Link>
           </div>
         ) : (
-          <div style={{ marginBottom: 20 }}>
-            <div style={{ marginBottom: 12 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: '#7A5C42', display: 'block', marginBottom: 6, textTransform: 'uppercase' }}>
-                Numéro de carte
-              </label>
-              <input type="text" placeholder="1234 5678 9012 3456" style={{
-                width: '100%', padding: '12px 16px',
-                border: '1.5px solid #E8D5B0', borderRadius: 8,
-                fontSize: 16, fontFamily: 'sans-serif',
-                background: 'white', boxSizing: 'border-box',
-              }} />
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: '#7A5C42', display: 'block', marginBottom: 6, textTransform: 'uppercase' }}>
-                  Expiration
-                </label>
-                <input type="text" placeholder="MM/AA" style={{
-                  width: '100%', padding: '12px 16px',
-                  border: '1.5px solid #E8D5B0', borderRadius: 8,
-                  fontSize: 16, fontFamily: 'sans-serif',
-                  background: 'white', boxSizing: 'border-box',
-                }} />
+          <>
+            {items.map((item) => (
+              <div key={item.id} style={{
+                background: 'white', borderRadius: 12, padding: 16,
+                marginBottom: 12, display: 'flex', alignItems: 'center',
+                gap: 16, border: '1px solid #E8D5B0',
+              }}>
+                <div style={{
+                  width: 60, height: 60, background: '#F5ECD7',
+                  borderRadius: 8, display: 'flex', alignItems: 'center',
+                  justifyContent: 'center', fontSize: 28, flexShrink: 0,
+                  overflow: 'hidden',
+                }}>
+                  {item.image_url ? (
+                    <img src={item.image_url} alt={item.name}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : item.emoji}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 2 }}>{item.name}</div>
+                  <div style={{ fontSize: 14, color: '#2D6A4F', fontWeight: 700 }}>
+                    {(item.price * item.quantity).toLocaleString('fr-FR')} FCFA
+                  </div>
+                  <div style={{ fontSize: 11, color: '#7A5C42' }}>
+                    {item.price.toLocaleString('fr-FR')} FCFA / unité
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <button onClick={() => updateQty(item.id, -1)} style={{
+                    width: 28, height: 28, borderRadius: '50%',
+                    border: '1.5px solid #5C3317', background: 'none',
+                    cursor: 'pointer', fontSize: 14, fontWeight: 700,
+                    color: '#5C3317', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>−</button>
+                  <span style={{ fontWeight: 700, minWidth: 20, textAlign: 'center' }}>{item.quantity}</span>
+                  <button onClick={() => updateQty(item.id, 1)} style={{
+                    width: 28, height: 28, borderRadius: '50%',
+                    border: '1.5px solid #5C3317', background: 'none',
+                    cursor: 'pointer', fontSize: 14, fontWeight: 700,
+                    color: '#5C3317', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>+</button>
+                  <button onClick={() => removeItem(item.id)} style={{
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    fontSize: 18, color: '#e53e3e', marginLeft: 8,
+                  }}>×</button>
+                </div>
               </div>
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: '#7A5C42', display: 'block', marginBottom: 6, textTransform: 'uppercase' }}>
-                  CVV
-                </label>
-                <input type="text" placeholder="123" style={{
-                  width: '100%', padding: '12px 16px',
-                  border: '1.5px solid #E8D5B0', borderRadius: 8,
-                  fontSize: 16, fontFamily: 'sans-serif',
-                  background: 'white', boxSizing: 'border-box',
-                }} />
+            ))}
+
+            {/* TOTAL */}
+            <div style={{
+              background: '#3A1F0A', borderRadius: 12, padding: 20,
+              color: '#F5ECD7', marginTop: 16,
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, marginBottom: 8 }}>
+                <span>Sous-total</span>
+                <span>{subtotal.toLocaleString('fr-FR')} FCFA</span>
               </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, marginBottom: 12 }}>
+                <span>Livraison</span>
+                <span>{livraison.toLocaleString('fr-FR')} FCFA</span>
+              </div>
+              <div style={{
+                display: 'flex', justifyContent: 'space-between',
+                fontSize: 20, fontWeight: 700,
+                borderTop: '1px solid rgba(245,236,215,0.2)', paddingTop: 12,
+              }}>
+                <span>Total</span>
+                <span>{total.toLocaleString('fr-FR')} FCFA</span>
+              </div>
+              <button onClick={() => router.push('/paiement')} style={{
+                width: '100%', background: '#2D6A4F', color: 'white',
+                border: 'none', padding: '14px', borderRadius: 24,
+                cursor: 'pointer', fontWeight: 700, fontSize: 16,
+                marginTop: 16, fontFamily: 'sans-serif',
+              }}>
+                💳 Procéder au paiement
+              </button>
             </div>
-          </div>
+          </>
         )}
-
-        <div style={{
-          background: 'white', borderRadius: 10,
-          padding: 16, marginBottom: 20,
-          border: '1px solid #E8D5B0',
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#7A5C42', marginBottom: 6 }}>
-            <span>Sous-total</span><span>310 000 FCFA</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#7A5C42', marginBottom: 10 }}>
-            <span>Livraison</span><span>2 500 FCFA</span>
-          </div>
-          <div style={{
-            display: 'flex', justifyContent: 'space-between',
-            fontSize: 18, fontWeight: 700, color: '#3A1F0A',
-            borderTop: '1px solid #E8D5B0', paddingTop: 10,
-          }}>
-            <span>Total</span>
-            <span>{total.toLocaleString('fr-FR')} FCFA</span>
-          </div>
-        </div>
-
-        <button
-          onClick={handlePay}
-          disabled={loading}
-          style={{
-            width: '100%',
-            background: method === 'wave' ? '#1B8EF8' : method === 'orange' ? '#FF6600' : '#1a1a2e',
-            color: 'white', border: 'none',
-            padding: '14px', borderRadius: 24,
-            cursor: 'pointer', fontWeight: 700,
-            fontSize: 16, fontFamily: 'sans-serif',
-          }}
-        >
-          {loading
-            ? '⏳ Traitement...'
-            : method === 'wave'
-            ? `🌊 Payer avec Wave — ${total.toLocaleString('fr-FR')} FCFA`
-            : method === 'orange'
-            ? `🟠 Payer avec Orange Money — ${total.toLocaleString('fr-FR')} FCFA`
-            : `💳 Payer par carte — ${total.toLocaleString('fr-FR')} FCFA`
-          }
-        </button>
       </div>
     </div>
   )

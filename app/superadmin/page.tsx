@@ -23,7 +23,7 @@ export default function SuperAdmin() {
   const [selectedQR, setSelectedQR] = useState<Employee | null>(null)
   const [selectedPay, setSelectedPay] = useState<Employee | null>(null)
   const [showAddModal, setShowAddModal] = useState(false)
-  const [activeTab, setActiveTab] = useState<'employees' | 'payments' | 'stats' | 'scanner'>('employees')
+  const [activeTab, setActiveTab] = useState<'employees' | 'payments' | 'stats' | 'scanner' | 'settings'>('employees')
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
   const [totalRevenue, setTotalRevenue] = useState(0)
   const [totalOrders, setTotalOrders] = useState(0)
@@ -34,6 +34,10 @@ export default function SuperAdmin() {
     name: '', email: '', role: 'employee' as 'admin' | 'employee',
     payment_type: 'salary' as 'salary' | 'percentage',
     salary: 0, percentage: 0,
+  })
+  const [paymentSettings, setPaymentSettings] = useState({
+    id: '', wave_link: '', orange_number: '',
+    bank_name: '', bank_account_name: '', bank_account_number: '', bank_iban: '',
   })
   const qrCanvasRef = useRef<HTMLCanvasElement>(null)
 
@@ -49,6 +53,7 @@ export default function SuperAdmin() {
       if (authData.user?.email === SUPER_ADMIN_EMAIL) {
         await loadEmployees()
         await loadStats()
+        await loadPaymentSettings()
       }
       setLoading(false)
     }
@@ -134,6 +139,27 @@ export default function SuperAdmin() {
     }
     const { count } = await supabase.from('profiles').select('*', { count: 'exact', head: true })
     setTotalUsers(count || 0)
+  }
+
+  const loadPaymentSettings = async () => {
+    const { data } = await supabase.from('payment_settings').select('*').limit(1).single()
+    if (data) setPaymentSettings(data)
+  }
+
+  const savePaymentSettings = async () => {
+    const { error } = await supabase.from('payment_settings')
+      .update({
+        wave_link: paymentSettings.wave_link,
+        orange_number: paymentSettings.orange_number,
+        bank_name: paymentSettings.bank_name,
+        bank_account_name: paymentSettings.bank_account_name,
+        bank_account_number: paymentSettings.bank_account_number,
+        bank_iban: paymentSettings.bank_iban,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', paymentSettings.id)
+    if (error) return showMsg('❌ Erreur: ' + error.message, 'error')
+    showMsg('✅ Coordonnées de paiement mises à jour !', 'success')
   }
 
   const addEmployee = async () => {
@@ -264,6 +290,7 @@ export default function SuperAdmin() {
             { key: 'payments', label: '💰 Paiements' },
             { key: 'stats', label: '📊 Statistiques' },
             { key: 'scanner', label: '📷 Scanner' },
+            { key: 'settings', label: '⚙️ Mes coordonnées' },
           ].map((tab) => (
             <button key={tab.key} onClick={() => {
               setActiveTab(tab.key as any)
@@ -522,6 +549,95 @@ export default function SuperAdmin() {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* ONGLET MES COORDONNÉES DE PAIEMENT */}
+        {activeTab === 'settings' && (
+          <div style={{ background: 'white', borderRadius: 14, border: '1px solid #E8D5B0', padding: 24 }}>
+            <h2 style={{ fontFamily: 'Georgia, serif', color: '#3A1F0A', fontSize: 17, margin: '0 0 4px' }}>
+              ⚙️ Mes coordonnées de paiement
+            </h2>
+            <p style={{ fontSize: 12, color: '#7A5C42', margin: '0 0 20px' }}>
+              Ces informations seront affichées aux clients lors de la confirmation de leur commande.
+            </p>
+
+            {/* WAVE */}
+            <div style={{ marginBottom: 20, paddingBottom: 20, borderBottom: '1px solid #F5ECD7' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                <img src="/wave.png" alt="Wave" style={{ width: 32, height: 32, borderRadius: 8, objectFit: 'cover' }} />
+                <h3 style={{ fontSize: 14, fontWeight: 700, color: '#2C1A0E', margin: 0 }}>Wave Business</h3>
+              </div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: '#7A5C42', display: 'block', marginBottom: 4 }}>
+                Lien de paiement Wave
+              </label>
+              <input
+                type="text"
+                placeholder="https://pay.wave.com/m/M_xxx/c/sn/"
+                value={paymentSettings.wave_link}
+                onChange={(e) => setPaymentSettings({ ...paymentSettings, wave_link: e.target.value })}
+                style={{ width: '100%', padding: '10px 14px', border: '1.5px solid #E8D5B0', borderRadius: 8, fontSize: 13, boxSizing: 'border-box' as const }}
+              />
+            </div>
+
+            {/* ORANGE MONEY */}
+            <div style={{ marginBottom: 20, paddingBottom: 20, borderBottom: '1px solid #F5ECD7' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                <img src="/orange.png" alt="Orange Money" style={{ width: 32, height: 32, borderRadius: 8, objectFit: 'cover' }} />
+                <h3 style={{ fontSize: 14, fontWeight: 700, color: '#2C1A0E', margin: 0 }}>Orange Money</h3>
+              </div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: '#7A5C42', display: 'block', marginBottom: 4 }}>
+                Numéro Orange Money
+              </label>
+              <input
+                type="tel"
+                placeholder="77 123 45 67"
+                value={paymentSettings.orange_number}
+                onChange={(e) => setPaymentSettings({ ...paymentSettings, orange_number: e.target.value })}
+                style={{ width: '100%', padding: '10px 14px', border: '1.5px solid #E8D5B0', borderRadius: 8, fontSize: 13, boxSizing: 'border-box' as const }}
+              />
+            </div>
+
+            {/* VIREMENT BANCAIRE */}
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                <div style={{ width: 32, height: 32, borderRadius: 8, background: '#F3EBFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>🏦</div>
+                <h3 style={{ fontSize: 14, fontWeight: 700, color: '#2C1A0E', margin: 0 }}>Virement bancaire</h3>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#7A5C42', display: 'block', marginBottom: 4 }}>Nom de la banque</label>
+                  <input type="text" placeholder="Ecobank, CBAO, etc." value={paymentSettings.bank_name}
+                    onChange={(e) => setPaymentSettings({ ...paymentSettings, bank_name: e.target.value })}
+                    style={{ width: '100%', padding: '10px 14px', border: '1.5px solid #E8D5B0', borderRadius: 8, fontSize: 13, boxSizing: 'border-box' as const }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#7A5C42', display: 'block', marginBottom: 4 }}>Titulaire du compte</label>
+                  <input type="text" placeholder="B@OB@B SHOP SARL" value={paymentSettings.bank_account_name}
+                    onChange={(e) => setPaymentSettings({ ...paymentSettings, bank_account_name: e.target.value })}
+                    style={{ width: '100%', padding: '10px 14px', border: '1.5px solid #E8D5B0', borderRadius: 8, fontSize: 13, boxSizing: 'border-box' as const }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#7A5C42', display: 'block', marginBottom: 4 }}>Numéro de compte</label>
+                  <input type="text" placeholder="SN08 SN12 3456 7890 1234 5678 90" value={paymentSettings.bank_account_number}
+                    onChange={(e) => setPaymentSettings({ ...paymentSettings, bank_account_number: e.target.value })}
+                    style={{ width: '100%', padding: '10px 14px', border: '1.5px solid #E8D5B0', borderRadius: 8, fontSize: 13, boxSizing: 'border-box' as const, fontFamily: 'monospace' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#7A5C42', display: 'block', marginBottom: 4 }}>IBAN (optionnel)</label>
+                  <input type="text" placeholder="SN08SN1234567890123456789012" value={paymentSettings.bank_iban}
+                    onChange={(e) => setPaymentSettings({ ...paymentSettings, bank_iban: e.target.value })}
+                    style={{ width: '100%', padding: '10px 14px', border: '1.5px solid #E8D5B0', borderRadius: 8, fontSize: 13, boxSizing: 'border-box' as const, fontFamily: 'monospace' }} />
+                </div>
+              </div>
+            </div>
+
+            <button onClick={savePaymentSettings} style={{
+              width: '100%', padding: '14px', background: '#2D6A4F', color: 'white',
+              border: 'none', borderRadius: 20, fontSize: 15, fontWeight: 700, cursor: 'pointer',
+            }}>
+              ✅ Enregistrer mes coordonnées
+            </button>
           </div>
         )}
       </div>

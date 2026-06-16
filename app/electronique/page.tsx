@@ -27,8 +27,14 @@ export default function Electronique() {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [activeSub, setActiveSub] = useState('all')
+  const [toast, setToast] = useState<string | null>(null)
 
   useEffect(() => { fetchProducts() }, [activeSub])
+
+  const showToast = (msg: string) => {
+    setToast(msg)
+    setTimeout(() => setToast(null), 2000)
+  }
 
   const fetchProducts = async () => {
     setLoading(true)
@@ -41,11 +47,21 @@ export default function Electronique() {
 
   return (
     <div>
+      {/* TOAST */}
+      {toast && (
+        <div style={{
+          position: 'fixed', bottom: 90, left: '50%', transform: 'translateX(-50%)',
+          background: '#2D6A4F', color: 'white', padding: '10px 20px',
+          borderRadius: 20, fontSize: 13, fontWeight: 600, zIndex: 1000,
+          boxShadow: '0 4px 12px rgba(0,0,0,0.2)', fontFamily: 'sans-serif',
+          whiteSpace: 'nowrap',
+        }}>
+          ✅ {toast}
+        </div>
+      )}
+
       {/* HEADER */}
-      <div style={{
-        background: 'linear-gradient(135deg, #3A1F0A, #5C3317)',
-        padding: '32px 24px',
-      }}>
+      <div style={{ background: 'linear-gradient(135deg, #3A1F0A, #5C3317)', padding: '32px 24px' }}>
         <h1 style={{ fontFamily: 'Georgia, serif', color: '#F5ECD7', fontSize: 32, margin: 0, marginBottom: 8 }}>
           📱 Électronique
         </h1>
@@ -94,7 +110,7 @@ export default function Electronique() {
             gap: 16,
           }}>
             {products.map((p) => (
-              <Link key={p.id} href={`/produit/${p.id}`} style={{ textDecoration: 'none' }}>
+              <Link key={p.id} href={`/produit/${p.id}`} prefetch={true} style={{ textDecoration: 'none' }}>
                 <div style={{
                   background: 'white', borderRadius: 12,
                   overflow: 'hidden', border: '1px solid #E8D5B0', cursor: 'pointer',
@@ -109,7 +125,6 @@ export default function Electronique() {
                         style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     ) : (p.emoji || '📱')}
                   </div>
-
                   <div style={{ padding: 12 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4, color: '#2C1A0E' }}>
                       {p.name}
@@ -117,23 +132,14 @@ export default function Electronique() {
                     <div style={{ fontSize: 15, fontWeight: 700, color: '#2D6A4F', marginBottom: 8 }}>
                       {p.price?.toLocaleString('fr-FR')} FCFA
                     </div>
-                    <div style={{
-                      fontSize: 11, marginBottom: 8,
-                      color: p.stock > 0 ? '#2D6A4F' : '#e53e3e', fontWeight: 600,
-                    }}>
+                    <div style={{ fontSize: 11, marginBottom: 8, color: p.stock > 0 ? '#2D6A4F' : '#e53e3e', fontWeight: 600 }}>
                       {p.stock > 0 ? `✅ En stock (${p.stock})` : '❌ Rupture de stock'}
                     </div>
                     <button
                       onClick={(e) => {
                         e.preventDefault()
-                        addToCart({
-                          id: p.id,
-                          name: p.name,
-                          price: p.price,
-                          emoji: p.emoji || '📱',
-                          image_url: p.image_url,
-                        })
-                        alert('✅ Ajouté au panier !')
+                        addToCart({ id: p.id, name: p.name, price: p.price, emoji: p.emoji || '📱', image_url: p.image_url })
+                        showToast('Ajouté au panier !')
                       }}
                       disabled={p.stock === 0}
                       style={{

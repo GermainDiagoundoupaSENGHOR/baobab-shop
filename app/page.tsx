@@ -142,7 +142,12 @@ export default function Home() {
             gap: 14,
           }}>
             {products.map((p) => (
-              <Link key={p.id} href={`/produit/${p.id}`} style={{ textDecoration: 'none' }}>
+              <Link
+                key={p.id}
+                href={`/produit/${p.id}`}
+                prefetch={true}
+                style={{ textDecoration: 'none' }}
+              >
                 <div style={{
                   background: 'white', borderRadius: 12,
                   overflow: 'hidden', border: '1px solid #E8D5B0', cursor: 'pointer',

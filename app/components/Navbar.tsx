@@ -3,11 +3,13 @@ import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { getCartCount } from '@/lib/cart'
+import { supabase } from '@/lib/supabase'
 
 export default function Navbar() {
   const [search, setSearch] = useState('')
   const [showImageModal, setShowImageModal] = useState(false)
   const [cartCount, setCartCount] = useState(0)
+  const [unreadMessages, setUnreadMessages] = useState(0)
   const router = useRouter()
 
   useEffect(() => {
@@ -16,6 +18,50 @@ export default function Navbar() {
     window.addEventListener('cartUpdated', handleUpdate)
     return () => window.removeEventListener('cartUpdated', handleUpdate)
   }, [])
+
+  useEffect(() => {
+    loadUnreadMessages()
+
+    // Temps réel
+    const channel = supabase
+      .channel('unread-messages-navbar')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'conversations',
+      }, () => { loadUnreadMessages() })
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [])
+
+  const loadUnreadMessages = async () => {
+    const { data: userData } = await supabase.auth.getUser()
+    if (!userData.user) return
+
+    const isAdmin = userData.user.email === 'baobabshop@gmail.com'
+
+    if (isAdmin) {
+      // Admin : total des messages non lus de tous les clients
+      const { data } = await supabase
+        .from('conversations')
+        .select('unread_count')
+        .gt('unread_count', 0)
+      if (data) {
+        const total = data.reduce((sum, c) => sum + (c.unread_count || 0), 0)
+        setUnreadMessages(total)
+      }
+    } else {
+      // Client : messages non lus dans sa conversation
+      const { data } = await supabase
+        .from('messages')
+        .select('id')
+        .eq('read', false)
+        .eq('is_bot', false)
+        .neq('sender_id', userData.user.id)
+      if (data) setUnreadMessages(data.length)
+    }
+  }
 
   const handleSearch = () => {
     if (search.trim()) router.push(`/recherche?q=${encodeURIComponent(search)}`)
@@ -59,14 +105,19 @@ export default function Navbar() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            {/* MESSAGES */}
             <Link href="/messages" style={{ color: '#F5ECD7', textDecoration: 'none', fontSize: 22, position: 'relative' }}>
               💬
-              <span style={{
-                position: 'absolute', top: -8, right: -8, background: '#C9860A',
-                color: 'white', borderRadius: '50%', width: 18, height: 18,
-                fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700,
-              }}>3</span>
+              {unreadMessages > 0 && (
+                <span style={{
+                  position: 'absolute', top: -8, right: -8, background: '#C9860A',
+                  color: 'white', borderRadius: '50%', width: 18, height: 18,
+                  fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700,
+                }}>{unreadMessages}</span>
+              )}
             </Link>
+
+            {/* PANIER */}
             <Link href="/panier" style={{ position: 'relative', color: '#F5ECD7', textDecoration: 'none', fontSize: 24 }}>
               🛒
               {cartCount > 0 && (
@@ -77,6 +128,7 @@ export default function Navbar() {
                 }}>{cartCount}</span>
               )}
             </Link>
+
             <Link href="/auth" style={{
               background: '#2D6A4F', color: 'white', padding: '8px 16px',
               borderRadius: 20, textDecoration: 'none', fontSize: 13, fontWeight: 600,

@@ -43,12 +43,15 @@ export default function Vetements() {
   }
 
   const fetchProducts = async () => {
-    setLoading(true)
-    let query = supabase.from('products').select('*').eq('category', 'cloth')
-    if (activeSub !== 'all') query = query.eq('sub_category', activeSub)
-    const { data } = await query
-    setProducts(data || [])
-    setLoading(false)
+  setLoading(true)
+  let query = supabase.from('products').select('*').eq('category', 'cloth')
+  if (activeSub === 'men') query = query.eq('sub_category', 'men')
+  else if (activeSub === 'women') query = query.eq('sub_category', 'women')
+  else if (activeSub === 'kids') query = query.eq('sub_category', 'kids')
+  else if (activeSub !== 'all') query = query.eq('sub_category', activeSub)
+  const { data } = await query
+  setProducts(data || [])
+  setLoading(false)
   }
 
   return (

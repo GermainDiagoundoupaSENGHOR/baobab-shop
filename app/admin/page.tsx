@@ -16,6 +16,30 @@ interface Product {
   video_url?: string
 }
 
+const subCategories: Record<string, { key: string, label: string }[]> = {
+  elec: [
+    { key: '', label: 'Aucune' },
+    { key: 'phones', label: '📱 Téléphones' },
+    { key: 'laptops', label: '💻 Laptops' },
+    { key: 'access', label: '🎧 Accessoires' },
+  ],
+  cloth: [
+    { key: '', label: 'Aucune' },
+    { key: 'men', label: '👔 Hommes' },
+    { key: 'women', label: '👗 Femmes' },
+    { key: 'kids', label: '👕 Enfants' },
+    { key: 'men_women', label: '👔👗 Hommes & Femmes' },
+    { key: 'all_cloth', label: '👕 Tous (Hommes, Femmes, Enfants)' },
+  ],
+  agri: [
+    { key: '', label: 'Aucune' },
+    { key: 'seeds', label: '🌾 Semences' },
+    { key: 'tools', label: '🔧 Outils' },
+    { key: 'fertilizers', label: '🌿 Engrais' },
+    { key: 'animals', label: '🐄 Animaux' },
+  ],
+}
+
 export default function Admin() {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
@@ -90,8 +114,6 @@ export default function Admin() {
   const uploadFile = async (file: File, folder: string) => {
     const ext = file.name.split('.').pop()
     const path = `${folder}/${Date.now()}.${ext}`
-    const { data: buckets } = await supabase.storage.listBuckets()
-    console.log('Buckets:', JSON.stringify(buckets?.map(b => b.name)))
     const { error } = await supabase.storage.from('Products').upload(path, file, { upsert: true })
     if (error) throw error
     const { data } = supabase.storage.from('Products').getPublicUrl(path)
@@ -283,21 +305,49 @@ export default function Admin() {
             ))}
           </div>
 
+          {/* CATÉGORIE */}
           <div style={{ marginTop: 12 }}>
-            <label style={{ fontSize: 12, fontWeight: 600, color: '#7A5C42', display: 'block', marginBottom: 4 }}>Catégorie</label>
-            <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}
-              style={{ width: '100%', padding: '10px 12px', border: '1.5px solid #E8D5B0', borderRadius: 8, fontSize: 14 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#7A5C42', display: 'block', marginBottom: 4 }}>
+              Catégorie
+            </label>
+            <select
+              value={form.category}
+              onChange={(e) => setForm({ ...form, category: e.target.value, sub_category: '' })}
+              style={{ width: '100%', padding: '10px 12px', border: '1.5px solid #E8D5B0', borderRadius: 8, fontSize: 14 }}
+            >
               <option value="elec">📱 Électronique</option>
               <option value="cloth">👗 Vêtements</option>
               <option value="agri">🌱 Agriculture</option>
             </select>
           </div>
 
+          {/* SOUS-CATÉGORIE */}
           <div style={{ marginTop: 12 }}>
-            <label style={{ fontSize: 12, fontWeight: 600, color: '#7A5C42', display: 'block', marginBottom: 4 }}>Description</label>
-            <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })}
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#7A5C42', display: 'block', marginBottom: 4 }}>
+              Sous-catégorie
+            </label>
+            <select
+              value={form.sub_category}
+              onChange={(e) => setForm({ ...form, sub_category: e.target.value })}
+              style={{ width: '100%', padding: '10px 12px', border: '1.5px solid #E8D5B0', borderRadius: 8, fontSize: 14 }}
+            >
+              {subCategories[form.category]?.map((s) => (
+                <option key={s.key} value={s.key}>{s.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* DESCRIPTION */}
+          <div style={{ marginTop: 12 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#7A5C42', display: 'block', marginBottom: 4 }}>
+              Description
+            </label>
+            <textarea
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
               placeholder="Description du produit..." rows={3}
-              style={{ width: '100%', padding: '10px 12px', border: '1.5px solid #E8D5B0', borderRadius: 8, fontSize: 14, resize: 'vertical' as const, boxSizing: 'border-box' as const }} />
+              style={{ width: '100%', padding: '10px 12px', border: '1.5px solid #E8D5B0', borderRadius: 8, fontSize: 14, resize: 'vertical' as const, boxSizing: 'border-box' as const }}
+            />
           </div>
 
           {/* PHOTO */}
@@ -368,7 +418,6 @@ export default function Admin() {
           <span style={{ color: '#7A5C42', fontSize: 13 }}>{products.length} produits</span>
         </div>
 
-        {/* EN-TÊTES */}
         <div style={{
           display: 'grid', gridTemplateColumns: '2fr 1.2fr 0.8fr 0.8fr 0.8fr 0.8fr 80px',
           padding: '10px 20px', background: '#FAF5EC',

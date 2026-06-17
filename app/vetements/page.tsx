@@ -31,6 +31,9 @@ export default function Vetements() {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState<string | null>(null)
+  useEffect(() => {
+  setActiveSub(subParam || 'all')
+}, [subParam])
 
   useEffect(() => { fetchProducts() }, [activeSub])
 

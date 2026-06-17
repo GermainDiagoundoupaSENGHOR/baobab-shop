@@ -31,6 +31,9 @@ export default function Electronique() {
   const [loading, setLoading] = useState(true)
   const [activeSub, setActiveSub] = useState(subParam || 'all')
   const [toast, setToast] = useState<string | null>(null)
+  useEffect(() => {
+  setActiveSub(subParam || 'all')
+}, [subParam])
 
   useEffect(() => { fetchProducts() }, [activeSub])
 

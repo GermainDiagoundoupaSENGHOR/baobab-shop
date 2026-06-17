@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
 import { addToCart } from '@/lib/cart'
+import { useSearchParams } from 'next/navigation'
 
 interface Product {
   id: string
@@ -24,9 +25,11 @@ const subCats = [
 ]
 
 export default function Electronique() {
+  const searchParams = useSearchParams()
+  const subParam = searchParams.get('sub')
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeSub, setActiveSub] = useState('all')
+  const [activeSub, setActiveSub] = useState(subParam || 'all')
   const [toast, setToast] = useState<string | null>(null)
 
   useEffect(() => { fetchProducts() }, [activeSub])
@@ -63,10 +66,10 @@ export default function Electronique() {
       {/* HEADER */}
       <div style={{ background: 'linear-gradient(135deg, #3A1F0A, #5C3317)', padding: '32px 24px' }}>
         <h1 style={{ fontFamily: 'Georgia, serif', color: '#F5ECD7', fontSize: 32, margin: 0, marginBottom: 8 }}>
-          📱 Électronique
+          {activeSub === 'access' ? '🎧 Accessoires' : '📱 Électronique'}
         </h1>
         <p style={{ color: 'rgba(245,236,215,0.7)', margin: 0 }}>
-          Téléphones, laptops et accessoires
+          {activeSub === 'access' ? 'Écouteurs, câbles, coques et plus' : 'Téléphones, laptops et accessoires'}
         </p>
       </div>
 

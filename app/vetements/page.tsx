@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
 import { addToCart } from '@/lib/cart'
+import { useSearchParams } from 'next/navigation'
 
 interface Product {
   id: string
@@ -24,9 +25,11 @@ const subCats = [
 ]
 
 export default function Vetements() {
+  const searchParams = useSearchParams()
+  const subParam = searchParams.get('sub')
+  const [activeSub, setActiveSub] = useState(subParam || 'all')
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeSub, setActiveSub] = useState('all')
   const [toast, setToast] = useState<string | null>(null)
 
   useEffect(() => { fetchProducts() }, [activeSub])

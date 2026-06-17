@@ -137,29 +137,29 @@ export default function Navbar() {
         </div>
 
         {/* BARRE CATÉGORIES */}
-        <div style={{
-          background: '#5C3317', padding: '10px 24px',
-          display: 'flex', gap: 8, overflowX: 'auto',
-        }}>
-          {[
-            { label: 'Tous', href: '/' },
-            { label: '📱 Électronique', href: '/electronique' },
-            { label: '👗 Vêtements', href: '/vetements' },
-            { label: '🎧 Accessoires', href: '/?cat=access' },
-            { label: '👔 Hommes', href: '/?cat=men' },
-            { label: '👗 Femmes', href: '/?cat=women' },
-            { label: '👕 Enfants', href: '/?cat=kids' },
-            { label: '🌱 Agriculture', href: '/agriculture' },
-          ].map((cat) => (
-            <Link key={cat.label} href={cat.href} style={{
-              color: 'rgba(245,236,215,0.85)', textDecoration: 'none',
-              padding: '6px 14px', borderRadius: 16,
-              fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap',
-            }}>
-              {cat.label}
-            </Link>
-          ))}
-        </div>
+<div style={{
+  background: '#5C3317', padding: '10px 24px',
+  display: 'flex', gap: 8, overflowX: 'auto',
+}}>
+  {[
+    { label: 'Tous', href: '/' },
+{ label: '📱 Électronique', href: '/electronique' },
+{ label: '👗 Vêtements', href: '/vetements' },
+{ label: '🎧 Accessoires', href: '/electronique?sub=access' },
+{ label: '👔 Hommes', href: '/vetements?sub=men' },
+{ label: '👗 Femmes', href: '/vetements?sub=women' },
+{ label: '👕 Enfants', href: '/vetements?sub=kids' },
+{ label: '🌱 Agriculture', href: '/agriculture' },
+  ].map((cat) => (
+    <Link key={cat.label} href={cat.href} style={{
+      color: 'rgba(245,236,215,0.85)', textDecoration: 'none',
+      padding: '6px 14px', borderRadius: 16,
+      fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap',
+    }}>
+      {cat.label}
+    </Link>
+  ))}
+</div>
       </header>
 
       {/* MODAL RECHERCHE IMAGE */}

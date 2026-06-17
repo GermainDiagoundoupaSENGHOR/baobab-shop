@@ -59,24 +59,30 @@ export default function ProductDetail() {
     setLoading(false)
   }
 
-  const generateAiDescription = async () => {
-    if (!product) return
-    setAiLoading(true)
-    try {
-      const response = await fetch('/api/assistant', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: `Génère une description commerciale courte et attrayante pour ce produit vendu au Sénégal : "${product.name}", prix: ${product.price} FCFA, catégorie: ${product.category}. Maximum 3 phrases en français.`
-        })
+ const generateAiDescription = async () => {
+  if (!product) return
+  setAiLoading(true)
+  try {
+    const response = await fetch('/api/assistant', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        lang: 'fr',
+        messages: [
+          {
+            role: 'user',
+            content: `Génère une description commerciale courte et attrayante pour ce produit vendu au Sénégal : "${product.name}", prix: ${product.price} FCFA, catégorie: ${product.category}. Maximum 3 phrases en français.`
+          }
+        ]
       })
-      const data = await response.json()
-      setAiDescription(data.reply || data.message || 'Description non disponible')
-    } catch {
-      setAiDescription('Erreur lors de la génération de la description.')
-    }
-    setAiLoading(false)
+    })
+    const data = await response.json()
+    setAiDescription(data.message || 'Description non disponible')
+  } catch {
+    setAiDescription('Erreur lors de la génération de la description.')
   }
+  setAiLoading(false)
+}
 
   const getCategoryLabel = (cat: string) => {
     const cats: Record<string, string> = {

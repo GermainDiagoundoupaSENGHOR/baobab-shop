@@ -40,7 +40,15 @@ const subCategories: Record<string, { key: string, label: string }[]> = {
   ],
 }
 
+// Générer un PIN de 4 chiffres aléatoire
+const generatePin = () => Math.floor(1000 + Math.random() * 9000).toString()
+
 export default function Admin() {
+  const [pinVerified, setPinVerified] = useState(false)
+  const [pinInput, setPinInput] = useState('')
+  const [pinError, setPinError] = useState('')
+  const [pinLoading, setPinLoading] = useState(false)
+  const [currentUser, setCurrentUser] = useState<any>(null)
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -60,7 +68,57 @@ export default function Admin() {
     sub_category: '', emoji: '', description: '', stock: '',
   })
 
-  useEffect(() => { fetchProducts(); fetchOrderStats() }, [])
+  useEffect(() => {
+    checkUser()
+  }, [])
+
+  const checkUser = async () => {
+    const { data } = await supabase.auth.getUser()
+    setCurrentUser(data.user)
+    setLoading(false)
+  }
+
+  const verifyPin = async () => {
+    if (pinInput.length < 4) {
+      setPinError('❌ Le code doit contenir au moins 4 chiffres')
+      return
+    }
+    setPinLoading(true)
+    setPinError('')
+
+    // Vérifier le PIN dans la table employees
+    const { data } = await supabase
+      .from('employees')
+      .select('pin_code, email')
+      .eq('pin_code', pinInput)
+      .single()
+
+    setPinLoading(false)
+
+    if (!data) {
+      setPinError('❌ Code incorrect. Réessayez !')
+      setPinInput('')
+      return
+    }
+
+    // Vérifier que le PIN correspond à l'utilisateur connecté
+    if (currentUser && data.email !== currentUser.email) {
+      setPinError('❌ Ce code ne correspond pas à votre compte !')
+      setPinInput('')
+      return
+    }
+
+    setPinVerified(true)
+    fetchProducts()
+    fetchOrderStats()
+  }
+
+  useEffect(() => {
+    if (pinVerified) {
+      fetchProducts()
+      fetchOrderStats()
+    }
+  }, [pinVerified])
 
   const fetchProducts = async () => {
     setLoading(true)
@@ -186,6 +244,106 @@ export default function Admin() {
     cursor: 'pointer', background: '#FDFAF5',
   }
 
+  // PAGE PIN
+  if (!pinVerified) {
+    return (
+      <div style={{
+        background: '#F5ECD7', minHeight: '100vh',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontFamily: 'sans-serif', padding: 24,
+      }}>
+        <div style={{
+          background: 'white', borderRadius: 20, padding: 40,
+          maxWidth: 360, width: '100%', textAlign: 'center',
+          boxShadow: '0 4px 24px rgba(0,0,0,0.08)',
+          border: '1px solid #E8D5B0',
+        }}>
+          <div style={{ fontSize: 52, marginBottom: 12 }}>🔐</div>
+          <h2 style={{ fontFamily: 'Georgia, serif', color: '#3A1F0A', fontSize: 22, margin: '0 0 8px' }}>
+            Accès Admin
+          </h2>
+          <p style={{ color: '#7A5C42', fontSize: 13, margin: '0 0 28px' }}>
+            Entrez votre code PIN à 4 chiffres pour accéder au tableau de bord
+          </p>
+
+          {/* AFFICHAGE DES POINTS */}
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginBottom: 24 }}>
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} style={{
+                width: 16, height: 16, borderRadius: '50%',
+                background: pinInput.length > i ? '#3A1F0A' : '#E8D5B0',
+                transition: 'background 0.2s',
+              }} />
+            ))}
+          </div>
+
+          {/* CLAVIER NUMÉRIQUE */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 16 }}>
+            {['1','2','3','4','5','6','7','8','9','','0','⌫'].map((k, idx) => (
+              <button
+                key={idx}
+                onClick={() => {
+                  if (k === '⌫') {
+                    setPinInput(prev => prev.slice(0, -1))
+                    setPinError('')
+                  } else if (k !== '' && pinInput.length < 4) {
+                    const newPin = pinInput + k
+                    setPinInput(newPin)
+                    setPinError('')
+                    if (newPin.length === 4) {
+                      // Auto-vérification quand 4 chiffres entrés
+                      setTimeout(async () => {
+                        setPinLoading(true)
+                        const { data } = await supabase
+                          .from('employees')
+                          .select('pin_code, email')
+                          .eq('pin_code', newPin)
+                          .single()
+                        setPinLoading(false)
+                        if (!data) {
+                          setPinError('❌ Code incorrect. Réessayez !')
+                          setPinInput('')
+                        } else {
+                          setPinVerified(true)
+                        }
+                      }, 200)
+                    }
+                  }
+                }}
+                style={{
+                  padding: '16px', fontSize: 20, fontWeight: 700,
+                  background: k === '' ? 'transparent' : k === '⌫' ? '#fee2e2' : '#F5ECD7',
+                  color: k === '⌫' ? '#e53e3e' : '#3A1F0A',
+                  border: k === '' ? 'none' : '1.5px solid #E8D5B0',
+                  borderRadius: 12, cursor: k === '' ? 'default' : 'pointer',
+                  transition: 'background 0.15s',
+                  visibility: k === '' ? 'hidden' as const : 'visible' as const,
+                }}
+              >
+                {k}
+              </button>
+            ))}
+          </div>
+
+          {/* ERREUR */}
+          {pinError && (
+            <div style={{
+              background: '#fee2e2', color: '#991b1b',
+              borderRadius: 10, padding: '10px 16px',
+              fontSize: 13, fontWeight: 600, marginBottom: 12,
+            }}>
+              {pinError}
+            </div>
+          )}
+
+          {pinLoading && (
+            <div style={{ color: '#7A5C42', fontSize: 13 }}>⏳ Vérification...</div>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div style={{ background: '#F5ECD7', minHeight: '100vh', padding: 20, fontFamily: 'sans-serif' }}>
 
@@ -305,58 +463,36 @@ export default function Admin() {
             ))}
           </div>
 
-          {/* CATÉGORIE */}
           <div style={{ marginTop: 12 }}>
-            <label style={{ fontSize: 12, fontWeight: 600, color: '#7A5C42', display: 'block', marginBottom: 4 }}>
-              Catégorie
-            </label>
-            <select
-              value={form.category}
-              onChange={(e) => setForm({ ...form, category: e.target.value, sub_category: '' })}
-              style={{ width: '100%', padding: '10px 12px', border: '1.5px solid #E8D5B0', borderRadius: 8, fontSize: 14 }}
-            >
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#7A5C42', display: 'block', marginBottom: 4 }}>Catégorie</label>
+            <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value, sub_category: '' })}
+              style={{ width: '100%', padding: '10px 12px', border: '1.5px solid #E8D5B0', borderRadius: 8, fontSize: 14 }}>
               <option value="elec">📱 Électronique</option>
               <option value="cloth">👗 Vêtements</option>
               <option value="agri">🌱 Agriculture</option>
             </select>
           </div>
 
-          {/* SOUS-CATÉGORIE */}
           <div style={{ marginTop: 12 }}>
-            <label style={{ fontSize: 12, fontWeight: 600, color: '#7A5C42', display: 'block', marginBottom: 4 }}>
-              Sous-catégorie
-            </label>
-            <select
-              value={form.sub_category}
-              onChange={(e) => setForm({ ...form, sub_category: e.target.value })}
-              style={{ width: '100%', padding: '10px 12px', border: '1.5px solid #E8D5B0', borderRadius: 8, fontSize: 14 }}
-            >
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#7A5C42', display: 'block', marginBottom: 4 }}>Sous-catégorie</label>
+            <select value={form.sub_category} onChange={(e) => setForm({ ...form, sub_category: e.target.value })}
+              style={{ width: '100%', padding: '10px 12px', border: '1.5px solid #E8D5B0', borderRadius: 8, fontSize: 14 }}>
               {subCategories[form.category]?.map((s) => (
                 <option key={s.key} value={s.key}>{s.label}</option>
               ))}
             </select>
           </div>
 
-          {/* DESCRIPTION */}
           <div style={{ marginTop: 12 }}>
-            <label style={{ fontSize: 12, fontWeight: 600, color: '#7A5C42', display: 'block', marginBottom: 4 }}>
-              Description
-            </label>
-            <textarea
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#7A5C42', display: 'block', marginBottom: 4 }}>Description</label>
+            <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })}
               placeholder="Description du produit..." rows={3}
-              style={{ width: '100%', padding: '10px 12px', border: '1.5px solid #E8D5B0', borderRadius: 8, fontSize: 14, resize: 'vertical' as const, boxSizing: 'border-box' as const }}
-            />
+              style={{ width: '100%', padding: '10px 12px', border: '1.5px solid #E8D5B0', borderRadius: 8, fontSize: 14, resize: 'vertical' as const, boxSizing: 'border-box' as const }} />
           </div>
 
-          {/* PHOTO */}
           <div style={{ marginTop: 20 }}>
-            <label style={{ fontSize: 13, fontWeight: 700, color: '#3A1F0A', display: 'block', marginBottom: 8 }}>
-              📸 Photo du produit
-            </label>
-            <input ref={imageInputRef} type="file" accept="image/jpeg,image/png,image/webp"
-              onChange={handleImageChange} style={{ display: 'none' }} />
+            <label style={{ fontSize: 13, fontWeight: 700, color: '#3A1F0A', display: 'block', marginBottom: 8 }}>📸 Photo du produit</label>
+            <input ref={imageInputRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={handleImageChange} style={{ display: 'none' }} />
             {!imagePreview ? (
               <div onClick={() => imageInputRef.current?.click()} style={uploadZoneStyle}>
                 <div style={{ fontSize: 32, marginBottom: 8 }}>⬆️</div>
@@ -366,22 +502,14 @@ export default function Admin() {
             ) : (
               <div style={{ position: 'relative', display: 'inline-block' }}>
                 <img src={imagePreview} alt="preview" style={{ width: 200, height: 200, objectFit: 'cover', borderRadius: 12, border: '2px solid #E8D5B0' }} />
-                <button onClick={() => { setImageFile(null); setImagePreview(null) }} style={{
-                  position: 'absolute', top: 6, right: 6, background: '#e53e3e',
-                  color: 'white', border: 'none', borderRadius: '50%',
-                  width: 24, height: 24, cursor: 'pointer', fontSize: 14, fontWeight: 700,
-                }}>×</button>
+                <button onClick={() => { setImageFile(null); setImagePreview(null) }} style={{ position: 'absolute', top: 6, right: 6, background: '#e53e3e', color: 'white', border: 'none', borderRadius: '50%', width: 24, height: 24, cursor: 'pointer', fontSize: 14, fontWeight: 700 }}>×</button>
               </div>
             )}
           </div>
 
-          {/* VIDÉO */}
           <div style={{ marginTop: 20 }}>
-            <label style={{ fontSize: 13, fontWeight: 700, color: '#3A1F0A', display: 'block', marginBottom: 8 }}>
-              🎬 Vidéo du produit (optionnel)
-            </label>
-            <input ref={videoInputRef} type="file" accept="video/mp4,video/mov,video/quicktime"
-              onChange={handleVideoChange} style={{ display: 'none' }} />
+            <label style={{ fontSize: 13, fontWeight: 700, color: '#3A1F0A', display: 'block', marginBottom: 8 }}>🎬 Vidéo du produit (optionnel)</label>
+            <input ref={videoInputRef} type="file" accept="video/mp4,video/mov,video/quicktime" onChange={handleVideoChange} style={{ display: 'none' }} />
             {!videoPreview ? (
               <div onClick={() => videoInputRef.current?.click()} style={uploadZoneStyle}>
                 <div style={{ fontSize: 32, marginBottom: 8 }}>🎬</div>
@@ -391,11 +519,7 @@ export default function Admin() {
             ) : (
               <div style={{ position: 'relative', display: 'inline-block' }}>
                 <video src={videoPreview} controls style={{ width: 300, borderRadius: 12, border: '2px solid #E8D5B0' }} />
-                <button onClick={() => { setVideoFile(null); setVideoPreview(null) }} style={{
-                  position: 'absolute', top: 6, right: 6, background: '#e53e3e',
-                  color: 'white', border: 'none', borderRadius: '50%',
-                  width: 24, height: 24, cursor: 'pointer', fontSize: 14, fontWeight: 700,
-                }}>×</button>
+                <button onClick={() => { setVideoFile(null); setVideoPreview(null) }} style={{ position: 'absolute', top: 6, right: 6, background: '#e53e3e', color: 'white', border: 'none', borderRadius: '50%', width: 24, height: 24, cursor: 'pointer', fontSize: 14, fontWeight: 700 }}>×</button>
               </div>
             )}
           </div>
@@ -437,9 +561,7 @@ export default function Admin() {
         {loading ? (
           <div style={{ textAlign: 'center', padding: 40 }}>⏳ Chargement...</div>
         ) : products.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: 40, color: '#7A5C42' }}>
-            Aucun produit — cliquez sur "+ Ajouter produit"
-          </div>
+          <div style={{ textAlign: 'center', padding: 40, color: '#7A5C42' }}>Aucun produit</div>
         ) : products.map((p) => {
           const cat = getCategoryLabel(p.category)
           const orders = orderCounts[p.id] || 0
@@ -452,14 +574,8 @@ export default function Admin() {
               borderBottom: '1px solid #F5ECD7',
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{
-                  width: 44, height: 44, borderRadius: 8, overflow: 'hidden',
-                  background: '#F5ECD7', flexShrink: 0,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22,
-                }}>
-                  {p.image_url
-                    ? <img src={p.image_url} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    : (p.emoji || '📦')}
+                <div style={{ width: 44, height: 44, borderRadius: 8, overflow: 'hidden', background: '#F5ECD7', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>
+                  {p.image_url ? <img src={p.image_url} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (p.emoji || '📦')}
                 </div>
                 <div>
                   <div style={{ fontSize: 14, fontWeight: 600, color: '#2C1A0E' }}>{p.name}</div>
@@ -467,46 +583,23 @@ export default function Admin() {
                 </div>
               </div>
               <div>
-                <span style={{
-                  background: cat.color + '15', color: cat.color,
-                  fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 20,
-                  border: `1px solid ${cat.color}30`,
-                }}>{cat.icon} {cat.label}</span>
+                <span style={{ background: cat.color + '15', color: cat.color, fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 20, border: `1px solid ${cat.color}30` }}>{cat.icon} {cat.label}</span>
               </div>
               <div style={{ textAlign: 'center' }}>
-                <span style={{
-                  background: p.stock > 10 ? '#D8F3DC' : p.stock > 0 ? '#FEF9C3' : '#FFE4E4',
-                  color: p.stock > 10 ? '#2D6A4F' : p.stock > 0 ? '#92400e' : '#e53e3e',
-                  fontSize: 12, fontWeight: 700, padding: '4px 10px', borderRadius: 20,
-                }}>{p.stock} {p.stock === 0 ? '❌' : p.stock <= 10 ? '⚠️' : '✅'}</span>
+                <span style={{ background: p.stock > 10 ? '#D8F3DC' : p.stock > 0 ? '#FEF9C3' : '#FFE4E4', color: p.stock > 10 ? '#2D6A4F' : p.stock > 0 ? '#92400e' : '#e53e3e', fontSize: 12, fontWeight: 700, padding: '4px 10px', borderRadius: 20 }}>
+                  {p.stock} {p.stock === 0 ? '❌' : p.stock <= 10 ? '⚠️' : '✅'}
+                </span>
               </div>
-              <div style={{ textAlign: 'center', fontSize: 13, fontWeight: 700, color: '#2D6A4F' }}>
-                {p.price?.toLocaleString('fr-FR')}
+              <div style={{ textAlign: 'center', fontSize: 13, fontWeight: 700, color: '#2D6A4F' }}>{p.price?.toLocaleString('fr-FR')}</div>
+              <div style={{ textAlign: 'center' }}>
+                <span style={{ background: orders > 0 ? '#DBEAFE' : '#F5F5F5', color: orders > 0 ? '#1B8EF8' : '#9A7B5A', fontSize: 12, fontWeight: 700, padding: '4px 10px', borderRadius: 20 }}>🛒 {orders}</span>
               </div>
               <div style={{ textAlign: 'center' }}>
-                <span style={{
-                  background: orders > 0 ? '#DBEAFE' : '#F5F5F5',
-                  color: orders > 0 ? '#1B8EF8' : '#9A7B5A',
-                  fontSize: 12, fontWeight: 700, padding: '4px 10px', borderRadius: 20,
-                }}>🛒 {orders}</span>
-              </div>
-              <div style={{ textAlign: 'center' }}>
-                <span style={{
-                  background: cancels > 0 ? '#FFE4E4' : '#F5F5F5',
-                  color: cancels > 0 ? '#e53e3e' : '#9A7B5A',
-                  fontSize: 12, fontWeight: 700, padding: '4px 10px', borderRadius: 20,
-                }}>❌ {cancels}</span>
+                <span style={{ background: cancels > 0 ? '#FFE4E4' : '#F5F5F5', color: cancels > 0 ? '#e53e3e' : '#9A7B5A', fontSize: 12, fontWeight: 700, padding: '4px 10px', borderRadius: 20 }}>❌ {cancels}</span>
               </div>
               <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
-                <button style={{
-                  background: 'none', border: '1px solid #E8D5B0',
-                  borderRadius: 6, padding: '5px 8px', fontSize: 14, cursor: 'pointer',
-                }}>✏️</button>
-                <button onClick={() => handleDelete(p.id)} style={{
-                  background: 'none', border: '1px solid #FFE4E4',
-                  borderRadius: 6, padding: '5px 8px', fontSize: 14,
-                  cursor: 'pointer', color: '#e53e3e',
-                }}>🗑️</button>
+                <button style={{ background: 'none', border: '1px solid #E8D5B0', borderRadius: 6, padding: '5px 8px', fontSize: 14, cursor: 'pointer' }}>✏️</button>
+                <button onClick={() => handleDelete(p.id)} style={{ background: 'none', border: '1px solid #FFE4E4', borderRadius: 6, padding: '5px 8px', fontSize: 14, cursor: 'pointer', color: '#e53e3e' }}>🗑️</button>
               </div>
             </div>
           )

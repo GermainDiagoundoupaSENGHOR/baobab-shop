@@ -5,11 +5,15 @@ import { useRouter } from 'next/navigation'
 import { getCartCount } from '@/lib/cart'
 import { supabase } from '@/lib/supabase'
 
+const ADMIN_EMAIL = 'baobabshop@gmail.com'
+
 export default function Navbar() {
   const [search, setSearch] = useState('')
   const [showImageModal, setShowImageModal] = useState(false)
   const [cartCount, setCartCount] = useState(0)
   const [unreadMessages, setUnreadMessages] = useState(0)
+  const [user, setUser] = useState<any>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -20,47 +24,56 @@ export default function Navbar() {
   }, [])
 
   useEffect(() => {
+    loadUser()
     loadUnreadMessages()
 
-    // Temps réel
+    const { data: authListener } = supabase.auth.onAuthStateChange((_, session) => {
+      setUser(session?.user || null)
+      setIsAdmin(session?.user?.email === ADMIN_EMAIL)
+      loadUnreadMessages()
+    })
+
     const channel = supabase
       .channel('unread-messages-navbar')
       .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'conversations',
+        event: '*', schema: 'public', table: 'conversations',
       }, () => { loadUnreadMessages() })
       .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
+    return () => {
+      authListener.subscription.unsubscribe()
+      supabase.removeChannel(channel)
+    }
   }, [])
+
+  const loadUser = async () => {
+    const { data } = await supabase.auth.getUser()
+    setUser(data.user || null)
+    setIsAdmin(data.user?.email === ADMIN_EMAIL)
+  }
 
   const loadUnreadMessages = async () => {
     const { data: userData } = await supabase.auth.getUser()
     if (!userData.user) return
-
-    const isAdmin = userData.user.email === 'baobabshop@gmail.com'
-
-    if (isAdmin) {
-      // Admin : total des messages non lus de tous les clients
-      const { data } = await supabase
-        .from('conversations')
-        .select('unread_count')
-        .gt('unread_count', 0)
+    const admin = userData.user.email === ADMIN_EMAIL
+    if (admin) {
+      const { data } = await supabase.from('conversations').select('unread_count').gt('unread_count', 0)
       if (data) {
         const total = data.reduce((sum, c) => sum + (c.unread_count || 0), 0)
         setUnreadMessages(total)
       }
     } else {
-      // Client : messages non lus dans sa conversation
-      const { data } = await supabase
-        .from('messages')
-        .select('id')
-        .eq('read', false)
-        .eq('is_bot', false)
-        .neq('sender_id', userData.user.id)
+      const { data } = await supabase.from('messages').select('id')
+        .eq('read', false).eq('is_bot', false).neq('sender_id', userData.user.id)
       if (data) setUnreadMessages(data.length)
     }
+  }
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    setUser(null)
+    setIsAdmin(false)
+    router.push('/')
   }
 
   const handleSearch = () => {
@@ -105,61 +118,98 @@ export default function Navbar() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            {/* MESSAGES */}
-            <Link href="/messages" style={{ color: '#F5ECD7', textDecoration: 'none', fontSize: 22, position: 'relative' }}>
-              💬
-              {unreadMessages > 0 && (
-                <span style={{
-                  position: 'absolute', top: -8, right: -8, background: '#C9860A',
-                  color: 'white', borderRadius: '50%', width: 18, height: 18,
-                  fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700,
-                }}>{unreadMessages}</span>
-              )}
-            </Link>
 
-            {/* PANIER */}
-            <Link href="/panier" style={{ position: 'relative', color: '#F5ECD7', textDecoration: 'none', fontSize: 24 }}>
-              🛒
-              {cartCount > 0 && (
-                <span style={{
-                  position: 'absolute', top: -8, right: -8, background: '#C9860A',
-                  color: 'white', borderRadius: '50%', width: 18, height: 18,
-                  fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700,
-                }}>{cartCount}</span>
-              )}
-            </Link>
+            {/* MESSAGES - visible seulement pour les clients */}
+            {!isAdmin && (
+              <Link href="/messages" style={{ color: '#F5ECD7', textDecoration: 'none', fontSize: 22, position: 'relative' }}>
+                💬
+                {unreadMessages > 0 && (
+                  <span style={{
+                    position: 'absolute', top: -8, right: -8, background: '#C9860A',
+                    color: 'white', borderRadius: '50%', width: 18, height: 18,
+                    fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700,
+                  }}>{unreadMessages}</span>
+                )}
+              </Link>
+            )}
 
-            <Link href="/auth" style={{
-              background: '#2D6A4F', color: 'white', padding: '8px 16px',
-              borderRadius: 20, textDecoration: 'none', fontSize: 13, fontWeight: 600,
-            }}>Connexion</Link>
+            {/* PANIER - visible seulement pour les clients */}
+            {!isAdmin && (
+              <Link href="/panier" style={{ position: 'relative', color: '#F5ECD7', textDecoration: 'none', fontSize: 24 }}>
+                🛒
+                {cartCount > 0 && (
+                  <span style={{
+                    position: 'absolute', top: -8, right: -8, background: '#C9860A',
+                    color: 'white', borderRadius: '50%', width: 18, height: 18,
+                    fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700,
+                  }}>{cartCount}</span>
+                )}
+              </Link>
+            )}
+
+            {/* BOUTON SELON RÔLE */}
+            {!user ? (
+  <Link href="/auth" style={{
+    background: '#2D6A4F', color: 'white', padding: '8px 16px',
+    borderRadius: 20, textDecoration: 'none', fontSize: 13, fontWeight: 600,
+  }}>Connexion</Link>
+) : isAdmin ? (
+  <div style={{ display: 'flex', gap: 8 }}>
+    <Link href="/admin" style={{
+      background: '#C9860A', color: 'white', padding: '8px 16px',
+      borderRadius: 20, textDecoration: 'none', fontSize: 13, fontWeight: 600,
+    }}>⚙️ Admin</Link>
+    <Link href="/superadmin" style={{
+      background: '#5C3317', color: 'white', padding: '8px 16px',
+      borderRadius: 20, textDecoration: 'none', fontSize: 13, fontWeight: 600,
+    }}>👑 SuperAdmin</Link>
+    {/* Déconnexion UNIQUEMENT pour le superadmin */}
+    {user.email === ADMIN_EMAIL && (
+      <button onClick={handleLogout} style={{
+        background: '#e53e3e', color: 'white', padding: '8px 16px',
+        borderRadius: 20, border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+      }}>🚪 Déconnexion</button>
+    )}
+  </div>
+) : (
+  <div style={{ display: 'flex', gap: 8 }}>
+    <Link href="/profil" style={{
+      background: '#2D6A4F', color: 'white', padding: '8px 16px',
+      borderRadius: 20, textDecoration: 'none', fontSize: 13, fontWeight: 600,
+    }}>👤 Mon compte</Link>
+    <button onClick={handleLogout} style={{
+      background: '#5C3317', color: 'white', padding: '8px 16px',
+      borderRadius: 20, border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+    }}>🚪 Déconnexion</button>
+  </div>
+)}
           </div>
         </div>
 
         {/* BARRE CATÉGORIES */}
-<div style={{
-  background: '#5C3317', padding: '10px 24px',
-  display: 'flex', gap: 8, overflowX: 'auto',
-}}>
-  {[
-    { label: 'Tous', href: '/' },
-{ label: '📱 Électronique', href: '/electronique' },
-{ label: '👗 Vêtements', href: '/vetements' },
-{ label: '🎧 Accessoires', href: '/electronique?sub=access' },
-{ label: '👔 Hommes', href: '/vetements?sub=men' },
-{ label: '👗 Femmes', href: '/vetements?sub=women' },
-{ label: '👕 Enfants', href: '/vetements?sub=kids' },
-{ label: '🌱 Agriculture', href: '/agriculture' },
-  ].map((cat) => (
-    <Link key={cat.label} href={cat.href} style={{
-      color: 'rgba(245,236,215,0.85)', textDecoration: 'none',
-      padding: '6px 14px', borderRadius: 16,
-      fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap',
-    }}>
-      {cat.label}
-    </Link>
-  ))}
-</div>
+        <div style={{
+          background: '#5C3317', padding: '10px 24px',
+          display: 'flex', gap: 8, overflowX: 'auto',
+        }}>
+          {[
+            { label: 'Tous', href: '/' },
+            { label: '📱 Électronique', href: '/electronique' },
+            { label: '👗 Vêtements', href: '/vetements' },
+            { label: '🎧 Accessoires', href: '/electronique?sub=access' },
+            { label: '👔 Hommes', href: '/vetements?sub=men' },
+            { label: '👗 Femmes', href: '/vetements?sub=women' },
+            { label: '👕 Enfants', href: '/vetements?sub=kids' },
+            { label: '🌱 Agriculture', href: '/agriculture' },
+          ].map((cat) => (
+            <Link key={cat.label} href={cat.href} style={{
+              color: 'rgba(245,236,215,0.85)', textDecoration: 'none',
+              padding: '6px 14px', borderRadius: 16,
+              fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap',
+            }}>
+              {cat.label}
+            </Link>
+          ))}
+        </div>
       </header>
 
       {/* MODAL RECHERCHE IMAGE */}

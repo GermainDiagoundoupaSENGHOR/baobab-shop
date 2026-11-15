@@ -2,13 +2,68 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
+// Étoiles dorées brillantes à choisir (1 à 5)
+function StarRating({ value, onChange }: { value: number; onChange: (n: number) => void }) {
+  const [hover, setHover] = useState(0)
+  const labels = ['', 'Décevant', 'Moyen', 'Bien', 'Très bien', 'Excellent !']
+  const active = hover || value
+
+  return (
+    <div>
+      <style>{`
+        @keyframes bbShine { 0%,100% { filter: drop-shadow(0 0 3px #F5C542) } 50% { filter: drop-shadow(0 0 11px #FFD700) } }
+      `}</style>
+      <div style={{ display: 'flex', gap: 8 }} onMouseLeave={() => setHover(0)}>
+        {[1, 2, 3, 4, 5].map((n) => {
+          const on = n <= active
+          return (
+            <button
+              key={n}
+              type="button"
+              onClick={() => onChange(n === value ? 0 : n)}
+              onMouseEnter={() => setHover(n)}
+              aria-label={`${n} étoile${n > 1 ? 's' : ''}`}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                transform: on ? 'scale(1.15)' : 'scale(1)', transition: 'transform .15s',
+                animation: on ? 'bbShine 1.8s ease-in-out infinite' : 'none',
+              }}
+            >
+              <svg width="46" height="46" viewBox="0 0 24 24">
+                <defs>
+                  <linearGradient id={`bbg${n}`} x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stopColor="#FFF3A0" />
+                    <stop offset="50%" stopColor="#F5C542" />
+                    <stop offset="100%" stopColor="#D4920A" />
+                  </linearGradient>
+                </defs>
+                <path
+                  d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3 6.1 20.6l1.3-6.6L2.5 9.4l6.6-.8z"
+                  fill={on ? `url(#bbg${n})` : '#F5ECD7'}
+                  stroke={on ? '#E0A800' : '#C9A66B'}
+                  strokeWidth="1"
+                  strokeLinejoin="round"
+                />
+                {on && <path d="M9 7.5l1.2-2" stroke="#fff" strokeWidth="1.2" strokeLinecap="round" opacity=".85" />}
+              </svg>
+            </button>
+          )
+        })}
+      </div>
+      <div style={{ marginTop: 8, fontSize: 13, fontWeight: 700, color: '#B8860B', minHeight: 18 }}>
+        {labels[active] || 'Touchez une étoile pour noter'}
+      </div>
+    </div>
+  )
+}
+
 export default function Commande() {
   const [form, setForm] = useState({
     nom: '',
     telephone: '',
     region: '',
     adresse: '',
-    notes: '',
+    rating: 0,
   })
   const router = useRouter()
 
@@ -44,6 +99,7 @@ export default function Commande() {
     if (!form.nom || !form.telephone || !form.region || !form.adresse) {
       return alert('Veuillez remplir tous les champs obligatoires !')
     }
+    try { localStorage.setItem('bb_rating', String(form.rating)) } catch {}
     router.push('/paiement')
   }
 
@@ -131,19 +187,10 @@ export default function Commande() {
               />
             </div>
 
-            {/* NOTES */}
+            {/* NOTE EN ÉTOILES */}
             <div>
-              <label style={labelStyle}>Notes (optionnel)</label>
-              <textarea
-                placeholder="Instructions spéciales pour la livraison..."
-                value={form.notes}
-                onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                rows={4}
-                style={{
-                  ...inputStyle,
-                  resize: 'vertical' as const,
-                }}
-              />
+              <label style={labelStyle}>Votre note ⭐ (optionnel)</label>
+              <StarRating value={form.rating} onChange={(n) => setForm({ ...form, rating: n })} />
             </div>
           </div>
 

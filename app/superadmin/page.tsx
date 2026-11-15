@@ -101,6 +101,7 @@ const NAV = [
   { key:'dashboard', icon:'⚡', label:'Dashboard' },
   { key:'employees', icon:'👥', label:'Employés' },
   { key:'payments',  icon:'💰', label:'Paiements' },
+  { key:'orders',    icon:'🧾', label:'Commandes' },
   { key:'products',  icon:'📦', label:'Produits' },
   { key:'zones',     icon:'🚚', label:'Zones livraison' },
   { key:'scanner',   icon:'📷', label:'Scanner QR' },
@@ -1036,6 +1037,10 @@ export default function SuperAdmin() {
           {/* ═══════════════════════════════════════════════════════════════
               ZONES LIVRAISON
           ═══════════════════════════════════════════════════════════════ */}
+          {activeTab === 'orders' && (
+  <iframe src="/gestion-commandes" title="Commandes"
+    style={{ width:'100%', height:'85vh', border:'none', borderRadius:16 }} />
+)}
           {activeTab === 'zones' && (
             <div className="fade-up">
               <SectionHeader
